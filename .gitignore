@@ -10,3 +10,9 @@ wheels/
 .venv
 .DS_Store
 .python-version
+
+# IDE files
+.vscode/
+
+# environment files
+.env

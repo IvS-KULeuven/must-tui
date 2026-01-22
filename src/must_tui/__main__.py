@@ -1,20 +1,16 @@
-import asyncio
-import importlib.resources
-
-from .mib import read_pcf
 from .must_app import MUSTApp
-from .must import get_all_data_providers, login
+
+from egse.log import egse_logger
 
 
-async def main():
-    pcf_path = importlib.resources.files("must_tui").joinpath("data/mib/pcf.dat")
-    pcf_content = await read_pcf(pcf_path)
+def main():
+    egse_logger.info("Starting MUST TUI application...")
 
-    ctx = login()
-    _ = get_all_data_providers(ctx)
+    app = MUSTApp()
+    app.run()
 
-    MUSTApp(ctx, pcf_content).run()
+    egse_logger.info("MUST TUI application has stopped.")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

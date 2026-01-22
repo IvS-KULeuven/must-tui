@@ -5,7 +5,7 @@ OptionList {
 }
 
 #input-container {
-/*  border: solid red; */
+/*    border: solid red; */
     height: 3;
 }
 
@@ -16,9 +16,18 @@ OptionList {
 }
 
 #info-container {
-/*  border: solid red; */
+/*    border: solid red; */
     width: 1fr;
     height: 1fr;
+}
+
+#plot-controls {
+/*    border: solid red; */
+    height: 3;
+}
+
+#bt-plot-clear {
+/*    border: solid red; */
 }
 
 DataTable {
@@ -54,4 +63,7 @@ PlotWidget {
 /*    border: solid white; */
     width: 15;
     height: 3;
+}
+
+DateTimeRangePicker {
 }

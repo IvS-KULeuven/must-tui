@@ -1,16 +1,17 @@
 from dataclasses import dataclass, field
+import asyncio
 import datetime
 import json
 from pathlib import Path
 
-import requests
-from egse.log import logger
+import aiohttp
+from egse.log import logging, logger
+from egse.env import bool_env
 
 # from egse.system import title_to_kebab
 import rich
 
-start = "2025-11-25 12:00:00"
-end = "2025-12-05 00:00:00"
+VERBOSE_DEBUG = bool_env("VERBOSE_DEBUG", default=False)
 
 
 # FIXME: use the code from egse.system when the new version of cgse-common is released.
@@ -23,45 +24,56 @@ def title_to_kebab(title_str: str) -> str:
 class MustContext:
     base_url: str = ""
     token: str = ""
+    authenticated: bool = False
     data_providers: list = field(default_factory=list)
 
 
-def login(config_file: Path | None = None):
+async def login(config_file: Path | None = None):
     """
     Login to MUST link with credentials from config.json.
 
-    If the path of the config file is not provided, it defaults to ~/must_config.json.
+    If the path of the config file is not provided, it defaults to ~/.config/must-tui/must_config.json.
     """
     context = MustContext()
 
-    config_file = config_file or Path.home() / "must_config.json"
+    config_file = config_file or Path.home() / ".config" / "must-tui" / "config.json"
+
+    if not config_file.exists():
+        logger.error(f"Config file {config_file} does not exist.")
+        return context
 
     with open(config_file) as config_fd:
         config = json.load(config_fd)
         context.base_url = config["base_url"]
+        connect_timeout = config.get("connect_timeout", 30)
         payload = {"username": config["username"], "password": config["password"]}
         header = {"content-type": "application/json"}
 
         try:
-            response = requests.post(context.base_url + "/auth/login", data=json.dumps(payload), headers=header)
-        except ConnectionError as exc:
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=60, connect=connect_timeout)
+            ) as session:
+                async with session.post(context.base_url + "/auth/login", json=payload, headers=header) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        context.token = data["token"]
+                        context.authenticated = True
+                        logger.info("Logged in successfully to MUST link.")
+                    else:
+                        if "token" in config:
+                            context.token = config["token"]
+                            context.authenticated = True
+                            logger.info("Retrieved token from config file.")
+                        else:
+                            logger.error("Login failed")
+        except (ConnectionError, aiohttp.ClientError) as exc:
             logger.error(f"ConnectionError: {exc}")
             return context
-
-        if response.status_code == 200:
-            context.token = response.json()["token"]
-            logger.info("Logged in successfully to MUST link.")
-        else:
-            if "token" in config:
-                context.token = config["token"]
-                logger.info("Retrieved token from config file.")
-            else:
-                logger.error("Login failed")
 
     return context
 
 
-def must_request(ctx: MustContext, path: str, mode: str = "GET", payload: dict | None = None):
+async def must_request(ctx: MustContext, path: str, mode: str = "GET", payload: dict | None = None):
     """
     Do a get or post request to the must link API.
 
@@ -72,7 +84,7 @@ def must_request(ctx: MustContext, path: str, mode: str = "GET", payload: dict |
         payload (dict, optional): The payload for POST requests.
 
     Returns:
-        The response object from the requests library.
+        The response data as a dictionary, or None if the request failed.
     """
     url = ctx.base_url + path
     logger.debug(f"{url=}")
@@ -83,25 +95,37 @@ def must_request(ctx: MustContext, path: str, mode: str = "GET", payload: dict |
     header = {"Authorization": ctx.token, "content-type": "application/json"}
     logger.debug(f"{header=}")
 
-    if mode == "GET":
-        response: requests.Response = requests.get(ctx.base_url + path, headers=header)
-    elif mode == "POST":
-        response = requests.post(ctx.base_url + path, data=json.dumps(payload), headers=header)
-    else:
-        logger.error(f"Invalid mode: {mode}")
+    try:
+        async with aiohttp.ClientSession() as session:
+            if mode == "GET":
+                async with session.get(url, headers=header) as response:
+                    if response.status == 401:
+                        logger.error("Not authorized, attempt to log in again.")
+                        return
+                    elif response.status == 404:
+                        logger.error(f"ERROR: Page not found, is the base_url correct? (base_url={ctx.base_url})")
+                        return
+                    else:
+                        return await response.json()
+            elif mode == "POST":
+                async with session.post(url, json=payload, headers=header) as response:
+                    if response.status == 401:
+                        logger.error("Not authorized, attempt to log in again.")
+                        return
+                    elif response.status == 404:
+                        logger.error(f"ERROR: Page not found, is the base_url correct? (base_url={ctx.base_url})")
+                        return
+                    else:
+                        return await response.json()
+            else:
+                logger.error(f"Invalid mode: {mode}")
+                return
+    except aiohttp.ClientError as exc:
+        logger.error(f"Request failed: {exc}")
         return
 
-    if response.status_code == 401:
-        logger.error("Not authorized, attempt to log in again.")
-        return
-    elif response.status_code == 404:
-        logger.error(f"ERROR: Page not found, is the base_url correct? (base_url={ctx.base_url})")
-        return
-    else:
-        return response
 
-
-def get_all_data_providers(ctx: MustContext) -> list[dict]:
+async def get_all_data_providers(ctx: MustContext) -> list[dict]:
     """Returns a list of all available data providers.
 
     Data providers are returned as a dictionary with the following keys:
@@ -118,17 +142,17 @@ def get_all_data_providers(ctx: MustContext) -> list[dict]:
     Returns:
         A list of data providers as dictionaries.
     """
-    response = must_request(ctx, "/dataproviders")
+    response = await must_request(ctx, "/dataproviders")
 
     logger.debug(response)
     if response is not None:
-        ctx.data_providers = response.json()
+        ctx.data_providers = response
         return ctx.data_providers
     else:
         return []
 
 
-def search_parameter_metadata(
+async def search_parameter_metadata(
     ctx: MustContext,
     data_provider: str,
     search_str: str,
@@ -149,17 +173,17 @@ def search_parameter_metadata(
     end = ""
     path = f"/dataproviders/{data_provider}/parameters/?mode=SIMPLE&search=true&key={search_keys}&value={search_str}&start={start}&end={end}"
 
-    response = must_request(ctx, path)
+    response = await must_request(ctx, path)
     logger.debug(f"{response=}")
 
     if response is not None:
-        return [{title_to_kebab(field): value for field, value in metadata.items()} for metadata in response.json()]
+        return [{title_to_kebab(field): value for field, value in metadata.items()} for metadata in response]
     else:
         return []
 
 
-def get_parameter_metadata(ctx: MustContext, par_name: str) -> list[dict]:
-    """Retrieve parameter metadata from a data provider within a specified time range.
+async def get_parameter_metadata(ctx: MustContext, par_name: str) -> list[dict]:
+    """Retrieve parameter metadata from all data providers in the context.
 
     The parameter metadata consists of:
 
@@ -188,18 +212,18 @@ def get_parameter_metadata(ctx: MustContext, par_name: str) -> list[dict]:
         logger.debug(f"Retrieving metadata for parameter {par_name} from data provider {data_provider}")
         path = f"/dataproviders/{data_provider['name']}/parameters?mode=SIMPLE&search=true&key=name&value={par_name}"
 
-        response = must_request(ctx, path)
+        response = await must_request(ctx, path)
         logger.debug(f"{response=}")
 
         if response is not None:
             result.extend(
-                [{title_to_kebab(field): value for field, value in metadata.items()} for metadata in response.json()]
+                [{title_to_kebab(field): value for field, value in metadata.items()} for metadata in response]
             )
 
     return result
 
 
-def get_parameter_data(
+async def get_parameter_data(
     ctx: MustContext, data_provider: str, par_name: str, start: str, end: str, paginated: bool = False
 ):
     """Retrieve parameter data for a parameter from a data provider within a specified time range.
@@ -265,7 +289,7 @@ def get_parameter_data(
     """
     cursor = ""
     count = 0
-    page_count = 4
+    page_count = 20  # safety limit to avoid infinite loops
 
     while True:
         count += 1
@@ -274,19 +298,20 @@ def get_parameter_data(
 
         path = (
             f"/dataproviders/{data_provider}/parameters/data{'/paginated' if paginated else ''}?"
-            f"key=name&values={par_name}&from={start}&to={end}&limit=100&cursor={cursor}"
+            f"key=name&values={par_name}&from={start}&to={end}&limit=1000&cursor={cursor}"
         )
 
-        response = must_request(ctx, path)
-        logger.debug(f"{response=}")
+        response = await must_request(ctx, path)
+        if VERBOSE_DEBUG:
+            logger.debug(f"{response=}")
 
         if response is not None:
-            data = response.json()
+            data = response
             if paginated:
-                cursor = data.get("cursor", "")
-                logger.debug(f"{cursor=}")
+                cursor = data.get("cursor")
+                logger.debug(f"{count=}, {cursor=}")
                 yield data.get("content", [])
-                if cursor == "":
+                if cursor is None:
                     break
             else:
                 yield data
@@ -321,10 +346,14 @@ def get_raw_data_with_timestamp(data: dict) -> tuple[list[datetime.datetime], li
     return timestamps, raw_values
 
 
-if __name__ == "__main__":
-    ctx = login()
-    if ctx:
-        providers = get_all_data_providers(ctx)
+async def _main():
+    ctx = await login()
+    if ctx.authenticated:
+        # start = "2023-01-01 00:00:00"
+        start = "2025-12-02 00:00:00"
+        end = "2025-12-31 23:59:59"
+
+        providers = await get_all_data_providers(ctx)
         logger.debug(providers)
         if providers:
             for provider in providers:
@@ -334,15 +363,15 @@ if __name__ == "__main__":
         else:
             logger.error("Failed to retrieve data providers.")
 
-        metadata = get_parameter_metadata(ctx, r"CNAA0965")
+        metadata = await get_parameter_metadata(ctx, r"CNAA0965")
         logger.info(f"Parameter metadata: {metadata}")
 
-        metadata = search_parameter_metadata(ctx, "PLATO", r"CNAA095.*", "name,description")
+        metadata = await search_parameter_metadata(ctx, "PLATO", r"CNAA095.*", "name,description")
         logger.info(f"Search results: {metadata}")
 
-        for data in get_parameter_data(ctx, "PLATO", r"CNAA0965", start, end, paginated=False):
+        async for data in get_parameter_data(ctx, "PLATO", r"CNAA0965", start, end, paginated=True):
             # logger.debug(f"Data response: {data['content'][0]['data']}")
-            rich.print(data)
+            # rich.print(data)
             # data = data["content"][0]["data"]  # this is a list of dictionaries with (date, value, calibratedValue) keys
             # logger.info(
             #     f"Parameter data: \n{
@@ -355,5 +384,12 @@ if __name__ == "__main__":
             #     }"
             # )
             raw_data = get_raw_data_with_timestamp(data)
+            # logger.info(f"Raw data with timestamps: {raw_data}")
             logger.info(f"Raw data length: {len(raw_data[0])} timestamps, {len(raw_data[1])} values")
-            logger.info(f"Raw data with timestamps: {raw_data}")
+    else:
+        logger.error("Authentication failed. Please check your credentials.")
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+    asyncio.run(_main())

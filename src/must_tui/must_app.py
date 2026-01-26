@@ -9,7 +9,7 @@ from itertools import cycle
 from textual_timepiece.pickers import DateTimeRangePicker
 from whenever import PlainDateTime, SystemDateTime, TimeDelta
 from egse.env import bool_env
-from textual import log, on
+from textual import log, on, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
@@ -19,6 +19,7 @@ from textual.widgets import Button, Checkbox, DataTable, Footer, Header, Input, 
 from textual_plotext import PlotextPlot as PlotWidget
 from thefuzz import process
 
+from must_tui.dialogs import ErrorDialog
 from must_tui.mib import read_pcf
 
 # from textual_plot import HiResMode, PlotWidget
@@ -331,6 +332,7 @@ class MUSTApp(App[None]):
             log.info("MUST context authenticated successfully.")
         else:
             log.error("MUST context authentication failed.")
+            self.call_later(self.show_error_dialog, "Failed to authenticate with the MUST server.")
 
         _ = await get_all_data_providers(self.must_ctx)
 
@@ -339,6 +341,15 @@ class MUSTApp(App[None]):
         self.options = sorted(self.pars_mapping.keys())
         self.query_one(OptionList).set_options(self.options)
         self.query_one(TimeRangePlotter).set_context(self.must_ctx)
+
+    @work()
+    async def show_error_dialog(self, error_message: str) -> None:
+        if await self.app.push_screen_wait(
+            ErrorDialog(
+                title="[b]An error occurred:[/]", error_message=error_message, ok_label="Abort", cancel_label="Ignore"
+            )
+        ):
+            self.app.exit()
 
     @on(DateTimeRangePicker.Changed, "#datetime-range-picker")
     async def on_datetime_range_changed(self, event: DateTimeRangePicker.Changed) -> None:

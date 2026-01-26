@@ -67,3 +67,29 @@ PlotWidget {
 
 DateTimeRangePicker {
 }
+
+ErrorDialog {
+    align: center middle;
+}
+
+ErrorDialog > Vertical {
+    border: thick $primary 50%;
+    width: 50%;
+    height: 16;
+    background: $boost;
+    Label {
+        text-style: bold;
+        margin: 2 4;
+    }
+    Button {
+        margin: 0 2;
+    }
+    Horizontal {
+        width: 100%;
+        align: center top;
+        #btn-dialog-yes {
+            margin-right: 2;
+        }
+    }
+}
+

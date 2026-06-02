@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from itertools import cycle
 
 from textual_timepiece.pickers import DateTimeRangePicker
-from whenever import PlainDateTime, SystemDateTime, TimeDelta
+from whenever import PlainDateTime
 from egse.env import bool_env
 from egse.log import logger
 from textual import log, on, work

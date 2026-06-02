@@ -43,3 +43,33 @@ class ErrorDialog(ModalScreen[bool]):
         else:
             self.dismiss(False)
             # self.app.query_one("#console-log", ConsoleOutput).write_log_info("You pressed NO...")
+
+
+class WarningDialog(ModalScreen[bool]):
+    BINDINGS = [Binding("escape", "dismiss(False)", "", show=False)]
+
+    def __init__(
+        self,
+        title: Optional[str] = None,
+        warning_message: Optional[str] = None,
+        ok_label: Optional[str] = "OK",
+    ) -> None:
+        super().__init__()
+        self._title = title or "Warning"
+        self._warning_message = warning_message or "An unexpected warning has occurred."
+        self._ok_label = ok_label
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label(self._title)
+            yield Label(self._warning_message, id="lbl-warning-message")
+            with Horizontal():
+                yield Button(self._ok_label, variant="primary", id="btn-dialog-ok")
+
+    @on(Button.Pressed)
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """React to button press."""
+
+        if event.button.id == "btn-dialog-ok":
+            self.dismiss(False)
+            # self.app.query_one("#console-log", ConsoleOutput).write_log_info("You pressed OK...")

@@ -9,6 +9,7 @@ from itertools import cycle
 from textual_timepiece.pickers import DateTimeRangePicker
 from whenever import PlainDateTime, SystemDateTime, TimeDelta
 from egse.env import bool_env
+from egse.log import logger
 from textual import log, on, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -19,7 +20,7 @@ from textual.widgets import Button, Checkbox, DataTable, Footer, Header, Input, 
 from textual_plotext import PlotextPlot as PlotWidget
 from thefuzz import process
 
-from must_tui.dialogs import ErrorDialog
+from must_tui.dialogs import ErrorDialog, WarningDialog
 from must_tui.mib import read_pcf
 
 # from textual_plot import HiResMode, PlotWidget
@@ -106,7 +107,8 @@ class ParameterMetadata(Static):
         # self.table.fixed_rows = 1
         for field in PARAMETER_METADATA_FIELDS:
             value = self.metadata.get(field, "N/A")
-            log.debug(f"Adding row: {field}={value}")
+            if VERBOSE_DEBUG:
+                log.debug(f"Adding row: {field}={value}")
             self.table.add_row(field, str(value), key=field)
 
 
@@ -351,6 +353,12 @@ class MUSTApp(App[None]):
         ):
             self.app.exit()
 
+    @work()
+    async def show_warning_dialog(self, warning_message: str) -> None:
+        await self.app.push_screen_wait(
+            WarningDialog(title="[b]A warning occurred:[/]", warning_message=warning_message, ok_label="OK")
+        )
+
     @on(DateTimeRangePicker.Changed, "#datetime-range-picker")
     async def on_datetime_range_changed(self, event: DateTimeRangePicker.Changed) -> None:
         assert event.start is not None and event.end is not None
@@ -380,6 +388,13 @@ class MUSTApp(App[None]):
             log.info(
                 f"Updating data for parameter {par_name} from {self.time_range.start} to {self.time_range.end}, data length: {len(timestamps)}"
             )
+
+            if not timestamps or not values:
+                log.warning(f"No data available for parameter {par_name} in the specified time range.")
+                self.call_later(
+                    self.show_warning_dialog, f"No data available for parameter {par_name} in the specified time range."
+                )
+                continue
 
             self.plot_widget.set_xlimits(self.time_range.start.py_datetime(), self.time_range.end.py_datetime())
             self.plot_widget.set_ylimits(min(values) - 1.0, max(values) + 1.0)
@@ -465,4 +480,7 @@ class MUSTApp(App[None]):
 
 if __name__ == "__main__":
     app = MUSTApp()
+
+    app.log.info("2Starting MUST TUI application...")
     app.run()
+    app.log.info("2MUST TUI application has stopped.")

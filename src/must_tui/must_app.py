@@ -68,6 +68,7 @@ class ParameterMetadata(Static):
     """Widget to display metadata about a selected parameter.
 
     The metadata information is obtained from the MUST server and consists of:
+
     - Description: parameter mnemonic
     - Data Type: one of UNSIGNED_SMALL_INT, ...
     - First Sample: 'YYYY-MM-DD HH:MM:SS'
@@ -116,6 +117,7 @@ class ParameterInfo(Static):
     """Widget to display information about a selected parameter.
 
     The information is obtained from the PCF file of the MIB and consists of:
+
     - description: parameter mnemonic
     - description_2: extended description
     - pid: On-board ID of the telemetry parameter

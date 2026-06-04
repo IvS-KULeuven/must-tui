@@ -1,0 +1,42 @@
+/* API docs hierarchy helpers for mkdocstrings output */
+
+.md-typeset .doc.doc-object > .doc-heading {
+  align-items: center;
+  border-radius: 0.3rem;
+  display: flex;
+  font-size: 0.84rem;
+  gap: 0.4rem;
+  line-height: 1.2;
+  margin-bottom: 0.5rem;
+  padding: 0.22rem 0.45rem;
+}
+
+.md-typeset .doc.doc-object.doc-module > .doc-heading {
+  background: rgba(33, 150, 243, 0.12);
+  border-left: 0.25rem solid #1e88e5;
+}
+
+.md-typeset .doc.doc-object.doc-class > .doc-heading {
+  background: rgba(0, 150, 136, 0.12);
+  border-left: 0.25rem solid #00897b;
+}
+
+.md-typeset .doc.doc-object.doc-function > .doc-heading,
+.md-typeset .doc.doc-object.doc-method > .doc-heading {
+  background: rgba(255, 167, 38, 0.12);
+  border-left: 0.25rem solid #f57c00;
+}
+
+.md-typeset .doc.doc-object.doc-attribute > .doc-heading {
+  background: rgba(126, 87, 194, 0.12);
+  border-left: 0.25rem solid #5e35b1;
+}
+
+.md-typeset .doc.doc-object > .doc-heading code {
+  font-size: 0.78em;
+}
+
+.md-typeset .doc.doc-object > .doc-heading .doc-symbol,
+.md-typeset .doc.doc-object > .doc-heading .doc-object-name {
+  font-size: 0.82em;
+}

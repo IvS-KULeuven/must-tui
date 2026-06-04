@@ -23,7 +23,7 @@ async def read_pcf(path: Path | Traversable) -> dict[str, dict]:
         - 'mapping': Mapping of the parameter mnemonic to the MIB name.
     """
 
-    with (contextlib.nullcontext(path) if isinstance(path, Path) else resources.as_file(path)) as resolved_path:
+    with contextlib.nullcontext(path) if isinstance(path, Path) else resources.as_file(path) as resolved_path:
         async with aiofiles.open(resolved_path, "r") as file:
             lines = await file.readlines()
 
@@ -112,7 +112,7 @@ async def _main() -> None:
     setup = load_setup()
     camera_setup = get_camera_setup("Brigand", setup)
     rich.print(camera_setup)
-    mib_name = camera_setup.names.mib_number
+    mib_name = camera_setup.names.mib
 
     rich.print(list(pcf.keys())[0:10])
 

@@ -20,6 +20,8 @@ uv tool install must-tui
 must-tui
 ```
 
+By default, plotting stays in the TUI. You can toggle to a separate interactive matplotlib window from the plot controls or with `p` when running in a graphical desktop session.
+
 ## Development
 
 ```bash

@@ -2497,12 +2497,13 @@ wheels = [
 
 [[package]]
 name = "must-tui"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "cgse-common" },
+    { name = "matplotlib" },
     { name = "pandas" },
     { name = "requests" },
     { name = "rich" },
@@ -2534,6 +2535,7 @@ requires-dist = [
     { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "cgse-common", editable = "../cgse/libs/cgse-common" },
+    { name = "matplotlib" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.6.0" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.29.0" },

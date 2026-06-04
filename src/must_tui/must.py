@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 import asyncio
 import datetime
 import json
+import os
 from pathlib import Path
 
 import aiohttp
@@ -30,9 +31,14 @@ class MustContext:
 
 async def login(config_file: Path | None = None):
     """
-    Login to MUST link with credentials from config.json.
+    Login to MUST link with credentials from configuration.
 
-    If the path of the config file is not provided, it defaults to ~/.config/must-tui/must_config.json.
+    Base URL, username, and password are first read from MUST_LINK_BASE_URL,
+    MUST_LINK_USERNAME, and MUST_LINK_PASSWORD. If unset, values from the
+    config file are used.
+
+    If the path of the config file is not provided, it defaults to
+    ~/.config/must-tui/config.json.
     """
     context = MustContext()
 
@@ -44,9 +50,22 @@ async def login(config_file: Path | None = None):
 
     with open(config_file) as config_fd:
         config = json.load(config_fd)
-        context.base_url = config["base_url"]
+        context.base_url = os.getenv("MUST_LINK_BASE_URL", config.get("base_url", ""))
+        if not context.base_url:
+            logger.error("Missing base URL. Set MUST_LINK_BASE_URL or provide base_url in the config file.")
+            return context
+
         connect_timeout = config.get("connect_timeout", 30)
-        payload = {"username": config["username"], "password": config["password"]}
+        username = os.getenv("MUST_LINK_USERNAME", config.get("username"))
+        password = os.getenv("MUST_LINK_PASSWORD", config.get("password"))
+        if not username or not password:
+            logger.error(
+                "Missing credentials. Set MUST_LINK_USERNAME and MUST_LINK_PASSWORD "
+                "or provide username/password in the config file."
+            )
+            return context
+
+        payload = {"username": username, "password": password}
         header = {"content-type": "application/json"}
 
         try:
@@ -229,13 +248,17 @@ async def get_parameter_data(
     """Retrieve parameter data for a parameter from a data provider within a specified time range.
 
     The dictionary has the following structure:
+
     - content: A list of dictionaries with the following keys:
+
         - monitoringChecks: None or a dictionary of monitoring checks
         - metadata: A list with parameter metadata as a dictionary: id, name, description, subsystem, dataType,type, complete, unit
         - data: A list of dictionaries with the following keys:
+
             - date (str): Timestamp in milliseconds since epoch
             - value (int): Raw value
             - calibratedValue (float): Calibrated value or 'N/A'
+
     - cursor: The cursor for pagination, empty string if no more data is available.
 
     Args:

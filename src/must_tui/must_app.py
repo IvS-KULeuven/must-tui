@@ -382,7 +382,14 @@ class MUSTApp(App[None]):
 
         self.options = sorted(self.pars_mapping.keys())
         if self.is_mounted:
-            self.query_one(OptionList).set_options(self.options)
+            search = self.query_one(Input).value
+            if search == "":
+                self.query_one(OptionList).set_options(self.options)
+            elif self.jump:
+                self.query_one(OptionList).set_options(self.options)
+                self.jump_to_item()
+            else:
+                self.filter_items()
 
     async def refresh_parameter_catalog(self, force_refresh: bool = False) -> None:
         if not self.must_ctx.authenticated:

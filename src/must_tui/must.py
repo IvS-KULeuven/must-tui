@@ -4,15 +4,17 @@ import datetime
 import json
 import os
 from pathlib import Path
+import re
 
 import aiohttp
 from egse.log import logging, logger
 from egse.env import bool_env
+from must_tui.parameter_cache import load_parameter_cache_rows, reset_parameter_cache_db, store_parameter_cache_rows
 
 # from egse.system import title_to_kebab
-import rich
-
 VERBOSE_DEBUG = bool_env("VERBOSE_DEBUG", default=False)
+
+_PARAMETER_CATALOG_CACHE: dict[str, dict[str, dict[str, str]]] = {}
 
 
 # FIXME: use the code from egse.system when the new version of cgse-common is released.
@@ -227,6 +229,9 @@ async def get_parameter_metadata(ctx: MustContext, par_name: str) -> list[dict]:
 
     result = []
 
+    if not ctx.data_providers:
+        await get_all_data_providers(ctx)
+
     for data_provider in ctx.data_providers:
         logger.debug(f"Retrieving metadata for parameter {par_name} from data provider {data_provider}")
         path = f"/dataproviders/{data_provider['name']}/parameters?mode=SIMPLE&search=true&key=name&value={par_name}"
@@ -240,6 +245,194 @@ async def get_parameter_metadata(ctx: MustContext, par_name: str) -> list[dict]:
             )
 
     return result
+
+
+def _parameter_cache_key(data_provider: str | None) -> str:
+    return data_provider or "__all__"
+
+
+def _normalize_parameter_metadata(metadata: dict, provider_name: str) -> dict[str, str]:
+    """Normalize metadata values for cache storage and UI use."""
+
+    normalized = {str(key): str(value) for key, value in metadata.items() if value is not None}
+    normalized.setdefault("provider", provider_name)
+    normalized.setdefault("name", "")
+    normalized.setdefault("description", normalized.get("name", ""))
+    return normalized
+
+
+def _rows_to_parameter_catalog(rows: list[dict]) -> dict[str, dict[str, str]]:
+    catalog: dict[str, dict[str, str]] = {}
+    for row in rows:
+        provider_name = str(row.get("provider", ""))
+        normalized = _normalize_parameter_metadata(row, provider_name)
+        parameter_name = normalized.get("name")
+        if parameter_name:
+            catalog[parameter_name] = normalized
+    return catalog
+
+
+async def _load_parameter_catalog_for_provider(
+    ctx: MustContext,
+    data_provider: str,
+) -> dict[str, dict[str, str]]:
+    """Load all parameter metadata for a data provider into memory."""
+
+    matches = await search_parameter_metadata(ctx, data_provider, "", "name,description")
+    if not matches:
+        matches = await search_parameter_metadata(ctx, data_provider, ".*", "name,description")
+
+    parameters: dict[str, dict[str, str]] = {}
+    for metadata in matches:
+        normalized = _normalize_parameter_metadata(metadata, data_provider)
+        parameter_name = normalized.get("name")
+        if parameter_name:
+            parameters.setdefault(parameter_name, normalized)
+
+    return dict(sorted(parameters.items()))
+
+
+async def load_parameter_catalog_async(
+    data_provider: str | None = None,
+    ctx: MustContext | None = None,
+    force_refresh: bool = False,
+) -> dict[str, dict[str, str]]:
+    """Load parameter metadata from memory, persistent cache, or MUST."""
+
+    cache_key = _parameter_cache_key(data_provider)
+    if not force_refresh and cache_key in _PARAMETER_CATALOG_CACHE:
+        return _PARAMETER_CATALOG_CACHE[cache_key]
+
+    if not force_refresh:
+        cached_rows = load_parameter_cache_rows(data_provider=data_provider)
+        if cached_rows:
+            catalog = _rows_to_parameter_catalog(cached_rows)
+            _PARAMETER_CATALOG_CACHE[cache_key] = catalog
+            return catalog
+
+    ctx = ctx or await login()
+    if not ctx.authenticated:
+        return {}
+
+    if data_provider is not None:
+        provider_names = [data_provider]
+    else:
+        if not ctx.data_providers:
+            await get_all_data_providers(ctx)
+        provider_names = [provider["name"] for provider in ctx.data_providers]
+
+    catalog: dict[str, dict[str, str]] = {}
+    for provider_name in provider_names:
+        catalog.update(await _load_parameter_catalog_for_provider(ctx, provider_name))
+
+    _PARAMETER_CATALOG_CACHE[cache_key] = dict(sorted(catalog.items()))
+    if catalog:
+        store_parameter_cache_rows(list(catalog.values()))
+
+    return _PARAMETER_CATALOG_CACHE[cache_key]
+
+
+def load_parameter_catalog(
+    data_provider: str | None = None,
+    force_refresh: bool = False,
+) -> dict[str, dict[str, str]]:
+    """Blocking convenience wrapper for `load_parameter_catalog_async()`."""
+
+    return asyncio.run(load_parameter_catalog_async(data_provider=data_provider, force_refresh=force_refresh))
+
+
+async def load_parameter_cache_async(
+    data_provider: str | None = None,
+    ctx: MustContext | None = None,
+    force_refresh: bool = False,
+) -> dict[str, str]:
+    """Load MUST parameter names and descriptions into an in-memory cache."""
+
+    catalog = await load_parameter_catalog_async(data_provider=data_provider, ctx=ctx, force_refresh=force_refresh)
+    return {name: metadata.get("description", "") for name, metadata in catalog.items()}
+
+
+def load_parameter_cache(
+    data_provider: str | None = None,
+    force_refresh: bool = False,
+) -> dict[str, str]:
+    """Blocking convenience wrapper for `load_parameter_cache_async()`."""
+
+    return asyncio.run(load_parameter_cache_async(data_provider=data_provider, force_refresh=force_refresh))
+
+
+def reset_parameter_cache(data_provider: str | None = None) -> None:
+    """Reset the in-memory parameter cache for one provider or for all providers."""
+
+    if data_provider is None:
+        _PARAMETER_CATALOG_CACHE.clear()
+        reset_parameter_cache_db()
+        return
+
+    _PARAMETER_CATALOG_CACHE.pop(data_provider, None)
+    _PARAMETER_CATALOG_CACHE.pop("__all__", None)
+    reset_parameter_cache_db(data_provider=data_provider)
+
+
+async def get_parameter_names_async(
+    name_pattern: str,
+    data_provider: str | None = None,
+    ctx: MustContext | None = None,
+    use_cache: bool = True,
+) -> dict[str, str]:
+    """Return matched parameter names and descriptions from MUST.
+
+    If a data provider is given, the search is limited to that provider.
+    Otherwise the search spans all data providers available in the MUST context.
+    """
+
+    if use_cache:
+        parameters = await load_parameter_cache_async(data_provider=data_provider, ctx=ctx)
+        try:
+            pattern = re.compile(name_pattern, re.IGNORECASE)
+        except re.error:
+            pattern = re.compile(re.escape(name_pattern), re.IGNORECASE)
+
+        return {
+            name: description
+            for name, description in parameters.items()
+            if pattern.search(name) or pattern.search(description)
+        }
+
+    ctx = ctx or await login()
+    if not ctx.authenticated:
+        return {}
+
+    if data_provider is not None:
+        provider_names = [data_provider]
+    else:
+        if not ctx.data_providers:
+            await get_all_data_providers(ctx)
+        provider_names = [provider["name"] for provider in ctx.data_providers]
+
+    parameter_names: dict[str, str] = {}
+    for provider_name in provider_names:
+        matches = await search_parameter_metadata(ctx, provider_name, name_pattern, "name,description")
+        for metadata in matches:
+            parameter_name = metadata.get("name")
+            description = metadata.get("description")
+            if isinstance(parameter_name, str) and parameter_name and isinstance(description, str):
+                parameter_names.setdefault(parameter_name, description)
+
+    return dict(sorted(parameter_names.items()))
+
+
+def get_parameter_names(
+    name_pattern: str,
+    data_provider: str | None = None,
+    use_cache: bool = True,
+) -> dict[str, str]:
+    """Return matching parameter names and descriptions for use from a Python REPL.
+
+    This is a blocking convenience wrapper around `get_parameter_names_async()`.
+    """
+
+    return asyncio.run(get_parameter_names_async(name_pattern, data_provider=data_provider, use_cache=use_cache))
 
 
 async def get_parameter_data(

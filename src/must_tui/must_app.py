@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import importlib.resources
 import re
@@ -26,11 +27,12 @@ from must_tui.mib import read_pcf
 # from egse.system import title_to_kebab
 from must_tui.must import (
     MustContext,
-    get_all_data_providers,
     get_parameter_data,
     get_parameter_metadata,
     get_raw_data_with_timestamp,
+    load_parameter_catalog_async,
     login,
+    reset_parameter_cache,
 )
 
 PARAMETER_INFO_FIELDS = """
@@ -283,10 +285,13 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
 
 class MUSTApp(App[None]):
     CSS_PATH = "must_app.tcss"
+    DATA_PROVIDER = "PLATO"
 
     BINDINGS = [
         ("ctrl+j", "toggle_jump", "Toggle Jump Mode"),
         ("p", "toggle_plot_backend", "Toggle plot backend"),
+        ("r", "refresh_parameter_cache", "Refresh parameter cache"),
+        ("ctrl+r", "reset_parameter_cache", "Reset parameter cache"),
         ("d", "app.toggle_dark", "Toggle light/dark mode"),
         ("m", "marker", "Cycle markers"),
         ("ctrl+q", "app.quit", "Quit"),
@@ -307,6 +312,7 @@ class MUSTApp(App[None]):
         self.must_ctx: MustContext = MustContext()
         self.pars: dict[str, dict] = {}
         self.pars_info: dict = {}
+        self.pars_catalog: dict = {}
         self.pars_mapping: dict = {}
         self.options: list[str] = sorted(self.pars_mapping.keys())
         self.jump = False
@@ -336,9 +342,6 @@ class MUSTApp(App[None]):
         yield Footer()
 
     async def on_mount(self) -> None:
-        pcf_path = importlib.resources.files("must_tui").joinpath("data/mib/pcf.dat")
-        pcf_content = await read_pcf(pcf_path)
-
         self.must_ctx = await login()
         if self.must_ctx.authenticated:
             log.info("MUST context authenticated successfully.")
@@ -346,16 +349,60 @@ class MUSTApp(App[None]):
             log.error("MUST context authentication failed.")
             self.call_later(self.show_error_dialog, "Failed to authenticate with the MUST server.")
 
-        _ = await get_all_data_providers(self.must_ctx)
+        try:
+            pcf_path = importlib.resources.files("must_tui").joinpath("data/mib/pcf.dat")
+            pcf_content = await read_pcf(pcf_path)
+            self.pars_info = pcf_content.get("pcf", {})
+            log.info(f"Loaded {len(self.pars_info)} MIB entries from pcf.dat for ParameterInfo enrichment.")
+        except Exception as exc:
+            self.pars_info = {}
+            log.warning(f"Could not load optional pcf.dat for ParameterInfo enrichment: {exc}")
 
-        self.pars_info = pcf_content["pcf"]
-        self.pars_mapping = pcf_content["mapping"]
-        self.options = sorted(self.pars_mapping.keys())
-        self.query_one(OptionList).set_options(self.options)
+        catalog = await load_parameter_catalog_async(data_provider=self.DATA_PROVIDER, ctx=self.must_ctx)
+        self._apply_parameter_catalog(catalog)
+
         self.query_one(TimeRangePlotter).set_context(self.must_ctx)
         self.matplotlib_plotter.set_context(self.must_ctx)
 
         self._update_plot_backend_button()
+
+        if self.must_ctx.authenticated and self.options:
+            asyncio.create_task(self.refresh_parameter_catalog(force_refresh=True))
+
+    def _apply_parameter_catalog(self, catalog: dict[str, dict[str, str]]) -> None:
+        self.pars_catalog = catalog
+        self.pars_mapping = {}
+
+        for mib_name, metadata in sorted(catalog.items()):
+            label_base = metadata.get("description") or mib_name
+            label = label_base
+            if label in self.pars_mapping and self.pars_mapping[label] != mib_name:
+                label = f"{label_base} [{mib_name}]"
+            self.pars_mapping[label] = mib_name
+
+        self.options = sorted(self.pars_mapping.keys())
+        if self.is_mounted:
+            search = self.query_one(Input).value
+            if search == "":
+                self.query_one(OptionList).set_options(self.options)
+            elif self.jump:
+                self.query_one(OptionList).set_options(self.options)
+                self.jump_to_item()
+            else:
+                self.filter_items()
+
+    async def refresh_parameter_catalog(self, force_refresh: bool = False) -> None:
+        if not self.must_ctx.authenticated:
+            return
+
+        catalog = await load_parameter_catalog_async(
+            data_provider=self.DATA_PROVIDER,
+            ctx=self.must_ctx,
+            force_refresh=force_refresh,
+        )
+        if catalog:
+            self._apply_parameter_catalog(catalog)
+            log.info(f"Loaded {len(catalog)} cached MUST parameters for provider {self.DATA_PROVIDER}.")
 
     def _matplotlib_backend_available(self) -> bool:
         return can_open_matplotlib_window()
@@ -426,7 +473,7 @@ class MUSTApp(App[None]):
 
     @on(ParameterSelected)
     async def on_par_selected(self, message: ParameterSelected) -> None:
-        data_provider = "PLATO"
+        data_provider = self.DATA_PROVIDER
         par_name = message.parameter_name
 
         async for data in get_parameter_data(
@@ -467,6 +514,13 @@ class MUSTApp(App[None]):
         mode = "Jump" if self.jump else "Filter"
         self.query_one(Input).placeholder = f"Search Mode: {mode}"
 
+    def action_refresh_parameter_cache(self) -> None:
+        asyncio.create_task(self.refresh_parameter_catalog(force_refresh=True))
+
+    def action_reset_parameter_cache(self) -> None:
+        reset_parameter_cache(self.DATA_PROVIDER)
+        asyncio.create_task(self.refresh_parameter_catalog(force_refresh=True))
+
     @on(Checkbox.Changed, "#regex-checkbox")
     def toggle_regex(self, event: Checkbox.Changed) -> None:
         log.debug(f"Regex checkbox changed: {event.value=}")
@@ -486,8 +540,11 @@ class MUSTApp(App[None]):
         par_name = event.option.prompt
         mib_name = self.pars_mapping.get(par_name)
         log.debug(f"{par_name=}, {mib_name=}")
-        if mib_name:
+        if mib_name and mib_name in self.pars_info:
             await self.query_one(ParameterInfo).update_info(mib_name, self.pars_info[mib_name])
+        else:
+            fallback_name = mib_name if isinstance(mib_name, str) and mib_name else str(par_name)
+            await self.query_one(ParameterInfo).update_info(fallback_name, {})
 
     @on(OptionList.OptionSelected)
     async def show_parameter_metadata(self, event: OptionList.OptionSelected) -> None:

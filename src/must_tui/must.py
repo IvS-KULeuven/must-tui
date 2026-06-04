@@ -4,15 +4,16 @@ import datetime
 import json
 import os
 from pathlib import Path
+import re
 
 import aiohttp
 from egse.log import logging, logger
 from egse.env import bool_env
 
 # from egse.system import title_to_kebab
-import rich
-
 VERBOSE_DEBUG = bool_env("VERBOSE_DEBUG", default=False)
+
+_PARAMETER_CACHE: dict[str, dict[str, str]] = {}
 
 
 # FIXME: use the code from egse.system when the new version of cgse-common is released.
@@ -240,6 +241,134 @@ async def get_parameter_metadata(ctx: MustContext, par_name: str) -> list[dict]:
             )
 
     return result
+
+
+async def _load_parameter_cache_for_provider(ctx: MustContext, data_provider: str) -> dict[str, str]:
+    """Load all parameter names and descriptions for a data provider into memory."""
+
+    matches = await search_parameter_metadata(ctx, data_provider, "", "name,description")
+    if not matches:
+        matches = await search_parameter_metadata(ctx, data_provider, ".*", "name,description")
+
+    parameters: dict[str, str] = {}
+    for metadata in matches:
+        parameter_name = metadata.get("name")
+        description = metadata.get("description")
+        if isinstance(parameter_name, str) and parameter_name and isinstance(description, str):
+            parameters.setdefault(parameter_name, description)
+
+    return dict(sorted(parameters.items()))
+
+
+async def load_parameter_cache_async(
+    data_provider: str | None = None,
+    ctx: MustContext | None = None,
+    force_refresh: bool = False,
+) -> dict[str, str]:
+    """Load MUST parameter names and descriptions into an in-memory cache."""
+
+    cache_key = data_provider or "__all__"
+    if not force_refresh and cache_key in _PARAMETER_CACHE:
+        return _PARAMETER_CACHE[cache_key]
+
+    ctx = ctx or await login()
+    if not ctx.authenticated:
+        return {}
+
+    if data_provider is not None:
+        provider_names = [data_provider]
+    else:
+        if not ctx.data_providers:
+            await get_all_data_providers(ctx)
+        provider_names = [provider["name"] for provider in ctx.data_providers]
+
+    parameters: dict[str, str] = {}
+    for provider_name in provider_names:
+        parameters.update(await _load_parameter_cache_for_provider(ctx, provider_name))
+
+    _PARAMETER_CACHE[cache_key] = dict(sorted(parameters.items()))
+    return _PARAMETER_CACHE[cache_key]
+
+
+def load_parameter_cache(
+    data_provider: str | None = None,
+    force_refresh: bool = False,
+) -> dict[str, str]:
+    """Blocking convenience wrapper for `load_parameter_cache_async()`."""
+
+    return asyncio.run(load_parameter_cache_async(data_provider=data_provider, force_refresh=force_refresh))
+
+
+def reset_parameter_cache(data_provider: str | None = None) -> None:
+    """Reset the in-memory parameter cache for one provider or for all providers."""
+
+    if data_provider is None:
+        _PARAMETER_CACHE.clear()
+        return
+
+    _PARAMETER_CACHE.pop(data_provider, None)
+    _PARAMETER_CACHE.pop("__all__", None)
+
+
+async def get_parameter_names_async(
+    name_pattern: str,
+    data_provider: str | None = None,
+    ctx: MustContext | None = None,
+    use_cache: bool = True,
+) -> dict[str, str]:
+    """Return matched parameter names and descriptions from MUST.
+
+    If a data provider is given, the search is limited to that provider.
+    Otherwise the search spans all data providers available in the MUST context.
+    """
+
+    if use_cache:
+        parameters = await load_parameter_cache_async(data_provider=data_provider, ctx=ctx)
+        try:
+            pattern = re.compile(name_pattern, re.IGNORECASE)
+        except re.error:
+            pattern = re.compile(re.escape(name_pattern), re.IGNORECASE)
+
+        return {
+            name: description
+            for name, description in parameters.items()
+            if pattern.search(name) or pattern.search(description)
+        }
+
+    ctx = ctx or await login()
+    if not ctx.authenticated:
+        return {}
+
+    if data_provider is not None:
+        provider_names = [data_provider]
+    else:
+        if not ctx.data_providers:
+            await get_all_data_providers(ctx)
+        provider_names = [provider["name"] for provider in ctx.data_providers]
+
+    parameter_names: dict[str, str] = {}
+    for provider_name in provider_names:
+        matches = await search_parameter_metadata(ctx, provider_name, name_pattern, "name,description")
+        for metadata in matches:
+            parameter_name = metadata.get("name")
+            description = metadata.get("description")
+            if isinstance(parameter_name, str) and parameter_name and isinstance(description, str):
+                parameter_names.setdefault(parameter_name, description)
+
+    return dict(sorted(parameter_names.items()))
+
+
+def get_parameter_names(
+    name_pattern: str,
+    data_provider: str | None = None,
+    use_cache: bool = True,
+) -> dict[str, str]:
+    """Return matching parameter names and descriptions for use from a Python REPL.
+
+    This is a blocking convenience wrapper around `get_parameter_names_async()`.
+    """
+
+    return asyncio.run(get_parameter_names_async(name_pattern, data_provider=data_provider, use_cache=use_cache))
 
 
 async def get_parameter_data(

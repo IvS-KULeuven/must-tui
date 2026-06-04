@@ -9,11 +9,12 @@ import re
 import aiohttp
 from egse.log import logging, logger
 from egse.env import bool_env
+from must_tui.parameter_cache import load_parameter_cache_rows, reset_parameter_cache_db, store_parameter_cache_rows
 
 # from egse.system import title_to_kebab
 VERBOSE_DEBUG = bool_env("VERBOSE_DEBUG", default=False)
 
-_PARAMETER_CACHE: dict[str, dict[str, str]] = {}
+_PARAMETER_CATALOG_CACHE: dict[str, dict[str, dict[str, str]]] = {}
 
 
 # FIXME: use the code from egse.system when the new version of cgse-common is released.
@@ -228,6 +229,9 @@ async def get_parameter_metadata(ctx: MustContext, par_name: str) -> list[dict]:
 
     result = []
 
+    if not ctx.data_providers:
+        await get_all_data_providers(ctx)
+
     for data_provider in ctx.data_providers:
         logger.debug(f"Retrieving metadata for parameter {par_name} from data provider {data_provider}")
         path = f"/dataproviders/{data_provider['name']}/parameters?mode=SIMPLE&search=true&key=name&value={par_name}"
@@ -243,33 +247,68 @@ async def get_parameter_metadata(ctx: MustContext, par_name: str) -> list[dict]:
     return result
 
 
-async def _load_parameter_cache_for_provider(ctx: MustContext, data_provider: str) -> dict[str, str]:
-    """Load all parameter names and descriptions for a data provider into memory."""
+def _parameter_cache_key(data_provider: str | None) -> str:
+    return data_provider or "__all__"
+
+
+def _normalize_parameter_metadata(metadata: dict, provider_name: str) -> dict[str, str]:
+    """Normalize metadata values for cache storage and UI use."""
+
+    normalized = {str(key): str(value) for key, value in metadata.items() if value is not None}
+    normalized.setdefault("provider", provider_name)
+    normalized.setdefault("name", "")
+    normalized.setdefault("description", normalized.get("name", ""))
+    return normalized
+
+
+def _rows_to_parameter_catalog(rows: list[dict]) -> dict[str, dict[str, str]]:
+    catalog: dict[str, dict[str, str]] = {}
+    for row in rows:
+        provider_name = str(row.get("provider", ""))
+        normalized = _normalize_parameter_metadata(row, provider_name)
+        parameter_name = normalized.get("name")
+        if parameter_name:
+            catalog[parameter_name] = normalized
+    return catalog
+
+
+async def _load_parameter_catalog_for_provider(
+    ctx: MustContext,
+    data_provider: str,
+) -> dict[str, dict[str, str]]:
+    """Load all parameter metadata for a data provider into memory."""
 
     matches = await search_parameter_metadata(ctx, data_provider, "", "name,description")
     if not matches:
         matches = await search_parameter_metadata(ctx, data_provider, ".*", "name,description")
 
-    parameters: dict[str, str] = {}
+    parameters: dict[str, dict[str, str]] = {}
     for metadata in matches:
-        parameter_name = metadata.get("name")
-        description = metadata.get("description")
-        if isinstance(parameter_name, str) and parameter_name and isinstance(description, str):
-            parameters.setdefault(parameter_name, description)
+        normalized = _normalize_parameter_metadata(metadata, data_provider)
+        parameter_name = normalized.get("name")
+        if parameter_name:
+            parameters.setdefault(parameter_name, normalized)
 
     return dict(sorted(parameters.items()))
 
 
-async def load_parameter_cache_async(
+async def load_parameter_catalog_async(
     data_provider: str | None = None,
     ctx: MustContext | None = None,
     force_refresh: bool = False,
-) -> dict[str, str]:
-    """Load MUST parameter names and descriptions into an in-memory cache."""
+) -> dict[str, dict[str, str]]:
+    """Load parameter metadata from memory, persistent cache, or MUST."""
 
-    cache_key = data_provider or "__all__"
-    if not force_refresh and cache_key in _PARAMETER_CACHE:
-        return _PARAMETER_CACHE[cache_key]
+    cache_key = _parameter_cache_key(data_provider)
+    if not force_refresh and cache_key in _PARAMETER_CATALOG_CACHE:
+        return _PARAMETER_CATALOG_CACHE[cache_key]
+
+    if not force_refresh:
+        cached_rows = load_parameter_cache_rows(data_provider=data_provider)
+        if cached_rows:
+            catalog = _rows_to_parameter_catalog(cached_rows)
+            _PARAMETER_CATALOG_CACHE[cache_key] = catalog
+            return catalog
 
     ctx = ctx or await login()
     if not ctx.authenticated:
@@ -282,12 +321,35 @@ async def load_parameter_cache_async(
             await get_all_data_providers(ctx)
         provider_names = [provider["name"] for provider in ctx.data_providers]
 
-    parameters: dict[str, str] = {}
+    catalog: dict[str, dict[str, str]] = {}
     for provider_name in provider_names:
-        parameters.update(await _load_parameter_cache_for_provider(ctx, provider_name))
+        catalog.update(await _load_parameter_catalog_for_provider(ctx, provider_name))
 
-    _PARAMETER_CACHE[cache_key] = dict(sorted(parameters.items()))
-    return _PARAMETER_CACHE[cache_key]
+    _PARAMETER_CATALOG_CACHE[cache_key] = dict(sorted(catalog.items()))
+    if catalog:
+        store_parameter_cache_rows(list(catalog.values()))
+
+    return _PARAMETER_CATALOG_CACHE[cache_key]
+
+
+def load_parameter_catalog(
+    data_provider: str | None = None,
+    force_refresh: bool = False,
+) -> dict[str, dict[str, str]]:
+    """Blocking convenience wrapper for `load_parameter_catalog_async()`."""
+
+    return asyncio.run(load_parameter_catalog_async(data_provider=data_provider, force_refresh=force_refresh))
+
+
+async def load_parameter_cache_async(
+    data_provider: str | None = None,
+    ctx: MustContext | None = None,
+    force_refresh: bool = False,
+) -> dict[str, str]:
+    """Load MUST parameter names and descriptions into an in-memory cache."""
+
+    catalog = await load_parameter_catalog_async(data_provider=data_provider, ctx=ctx, force_refresh=force_refresh)
+    return {name: metadata.get("description", "") for name, metadata in catalog.items()}
 
 
 def load_parameter_cache(
@@ -303,11 +365,13 @@ def reset_parameter_cache(data_provider: str | None = None) -> None:
     """Reset the in-memory parameter cache for one provider or for all providers."""
 
     if data_provider is None:
-        _PARAMETER_CACHE.clear()
+        _PARAMETER_CATALOG_CACHE.clear()
+        reset_parameter_cache_db()
         return
 
-    _PARAMETER_CACHE.pop(data_provider, None)
-    _PARAMETER_CACHE.pop("__all__", None)
+    _PARAMETER_CATALOG_CACHE.pop(data_provider, None)
+    _PARAMETER_CATALOG_CACHE.pop("__all__", None)
+    reset_parameter_cache_db(data_provider=data_provider)
 
 
 async def get_parameter_names_async(

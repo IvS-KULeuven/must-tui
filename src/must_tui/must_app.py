@@ -1,15 +1,13 @@
-import asyncio
 import datetime
-from functools import partial
 import importlib.resources
 import re
 from dataclasses import dataclass
 from itertools import cycle
+from typing import Any, cast
 
 from textual_timepiece.pickers import DateTimeRangePicker
 from whenever import PlainDateTime
 from egse.env import bool_env
-from egse.log import logger
 from textual import log, on, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -21,6 +19,7 @@ from textual_plotext import PlotextPlot as PlotWidget
 from thefuzz import process
 
 from must_tui.dialogs import ErrorDialog, WarningDialog
+from must_tui.matplotlib_bridge import MatplotlibPlotter, can_open_matplotlib_window
 from must_tui.mib import read_pcf
 
 # from textual_plot import HiResMode, PlotWidget
@@ -32,7 +31,6 @@ from must_tui.must import (
     get_parameter_metadata,
     get_raw_data_with_timestamp,
     login,
-    title_to_kebab,
 )
 
 PARAMETER_INFO_FIELDS = """
@@ -191,6 +189,7 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         self.title: str = "Parameter Data Plot"
         self.data: list[list[float]] = []
         self.time: list[list[datetime.datetime]] = []
+        self.labels: list[str] = []
         self.xlimits: tuple[datetime.datetime, datetime.datetime] | None = None
         self.ylimits: tuple[float, float] | None = None
 
@@ -205,17 +204,20 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
     def clear_plot(self) -> None:
         self.data = []
         self.time = []
+        self.labels = []
         self.plt.clear_data()
         self.replot()
 
     def set_xlimits(self, start: datetime.datetime, end: datetime.datetime) -> None:
         self.xlimits = (start, end)
-        self.plt.xlim(start.strftime("%Y-%m-%d %H:%M:%S"), end.strftime("%Y-%m-%d %H:%M:%S"))
+        plotter = cast(Any, self.plt)
+        plotter.xlim(start.strftime("%Y-%m-%d %H:%M:%S"), end.strftime("%Y-%m-%d %H:%M:%S"))
         self.refresh()
 
     def set_ylimits(self, ymin: float, ymax: float) -> None:
         self.ylimits = (ymin, ymax)
-        self.plt.ylim(ymin, ymax)
+        plotter = cast(Any, self.plt)
+        plotter.ylim(ymin, ymax)
         self.refresh()
 
     async def update(
@@ -227,6 +229,7 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
 
         self.time.append(timestamps)
         self.data.append(values)
+        self.labels.append(par_name)
 
         log.info(f"Updating plot for {par_name} with {len(values)} data points, {max(values)=}.")
 
@@ -235,13 +238,14 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
     def replot(self) -> None:
         """Replot the data with the current marker."""
         # self.plt.clear_data()
-        self.plt.clear_figure()  # not sure yet what the difference is with clf() or cld()
-        self.plt.date_form("Y-m-d H:M:S")
-        self.plt.title(self.title)
+        plotter = cast(Any, self.plt)
+        plotter.clear_figure()  # not sure yet what the difference is with clf() or cld()
+        plotter.date_form("Y-m-d H:M:S")
+        plotter.title(self.title)
         # self.plt.xlabel("Date-Time")  # takes too much real estate
         # self.plt.ylabel("Value")  # will be put in the same space as the x-label
         for time, data in zip(self.time, self.data):
-            self.plt.plot([x.strftime("%Y-%m-%d %H:%M:%S") for x in time], data, marker=self.marker)
+            plotter.plot([x.strftime("%Y-%m-%d %H:%M:%S") for x in time], data, marker=self.marker)
         self.refresh()
 
     async def _watch_marker(self) -> None:
@@ -282,6 +286,7 @@ class MUSTApp(App[None]):
 
     BINDINGS = [
         ("ctrl+j", "toggle_jump", "Toggle Jump Mode"),
+        ("p", "toggle_plot_backend", "Toggle plot backend"),
         ("d", "app.toggle_dark", "Toggle light/dark mode"),
         ("m", "marker", "Cycle markers"),
         ("ctrl+q", "app.quit", "Quit"),
@@ -308,6 +313,8 @@ class MUSTApp(App[None]):
         self.fuzz = False
         self.markers = cycle(self.MARKERS.keys())
         self.plot_widget: TimeRangePlotter = TimeRangePlotter(self.must_ctx)
+        self.matplotlib_plotter = MatplotlibPlotter()
+        self.plot_backend = "textual"
         self.time_range = TimeRange(start=PlainDateTime(2025, 12, 2), end=PlainDateTime(2025, 12, 5))
 
     def compose(self) -> ComposeResult:
@@ -323,6 +330,7 @@ class MUSTApp(App[None]):
                     yield ParameterMetadata()
                 with Horizontal(id="plot-controls"):
                     yield Button("Clear Plot", id="bt-plot-clear")
+                    yield Button("Plot: TUI", id="bt-plot-backend")
                     yield DateTimeRangePicker(self.time_range.start, self.time_range.end, id="datetime-range-picker")
                 yield self.plot_widget
         yield Footer()
@@ -345,6 +353,37 @@ class MUSTApp(App[None]):
         self.options = sorted(self.pars_mapping.keys())
         self.query_one(OptionList).set_options(self.options)
         self.query_one(TimeRangePlotter).set_context(self.must_ctx)
+        self.matplotlib_plotter.set_context(self.must_ctx)
+
+        self._update_plot_backend_button()
+
+    def _matplotlib_backend_available(self) -> bool:
+        return can_open_matplotlib_window()
+
+    def _update_plot_backend_button(self) -> None:
+        if not self.is_mounted:
+            return
+
+        button = self.query_one("#bt-plot-backend", Button)
+        button.label = "Plot: Matplotlib" if self.plot_backend == "matplotlib" else "Plot: TUI"
+
+    def _enable_matplotlib_backend(self) -> None:
+        if not self._matplotlib_backend_available():
+            self.call_later(
+                self.show_warning_dialog,
+                "Matplotlib plotting requires a graphical session with a window manager.",
+            )
+            return
+
+        self.plot_backend = "matplotlib"
+        self.matplotlib_plotter.start()
+        self.matplotlib_plotter.sync_from_plotter(self.plot_widget)
+        self._update_plot_backend_button()
+
+    def _disable_matplotlib_backend(self) -> None:
+        self.plot_backend = "textual"
+        self.matplotlib_plotter.close()
+        self._update_plot_backend_button()
 
     @work()
     async def show_error_dialog(self, error_message: str) -> None:
@@ -367,10 +406,22 @@ class MUSTApp(App[None]):
         log.info(f"DateTimeRangePicker changed: {event.start=} {event.end=}")
         # Convert to string format 'YYYY-MM-DD HH:MM:SS'
         self.call_later(self.plot_widget.set_xlimits, event.start.py_datetime(), event.end.py_datetime())
+        if self.plot_backend == "matplotlib":
+            self.call_later(self.matplotlib_plotter.set_xlimits, event.start.py_datetime(), event.end.py_datetime())
 
     @on(Button.Pressed, "#bt-plot-clear")
     def clear_plot(self, event) -> None:
         self.call_after_refresh(self.plot_widget.clear_plot)
+        self.call_after_refresh(self.matplotlib_plotter.clear_plot)
+        event.stop()
+
+    @on(Button.Pressed, "#bt-plot-backend")
+    def toggle_plot_backend(self, event) -> None:
+        if self.plot_backend == "matplotlib":
+            self._disable_matplotlib_backend()
+        else:
+            self._enable_matplotlib_backend()
+
         event.stop()
 
     @on(ParameterSelected)
@@ -401,6 +452,13 @@ class MUSTApp(App[None]):
             self.plot_widget.set_xlimits(self.time_range.start.py_datetime(), self.time_range.end.py_datetime())
             self.plot_widget.set_ylimits(min(values) - 1.0, max(values) + 1.0)
             await self.plot_widget.update(par_name, timestamps, values, self.time_range)
+
+            if self.plot_backend == "matplotlib":
+                self.matplotlib_plotter.set_xlimits(
+                    self.time_range.start.py_datetime(), self.time_range.end.py_datetime()
+                )
+                self.matplotlib_plotter.set_ylimits(min(values) - 1.0, max(values) + 1.0)
+                await self.matplotlib_plotter.update(par_name, timestamps, values, self.time_range)
 
         # self.plot_widget.replot()
 
@@ -474,10 +532,22 @@ class MUSTApp(App[None]):
         """React to the marker type being changed."""
         self.sub_title = self.MARKERS[self.marker]
         self.query_one(TimeRangePlotter).marker = self.marker
+        self.matplotlib_plotter.marker = self.marker
+        if self.plot_backend == "matplotlib":
+            self.matplotlib_plotter.replot()
 
     def action_marker(self) -> None:
         """Cycle to the next marker type."""
         self.marker = next(self.markers)
+
+    def action_toggle_plot_backend(self) -> None:
+        if self.plot_backend == "matplotlib":
+            self._disable_matplotlib_backend()
+        else:
+            self._enable_matplotlib_backend()
+
+    def on_shutdown(self) -> None:
+        self.matplotlib_plotter.close()
 
 
 if __name__ == "__main__":

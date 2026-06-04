@@ -9,6 +9,7 @@ dependencies = [
     "aiohttp",
     "cgse-common",
     "pandas",
+    "matplotlib",
     "requests",
     "rich",
     "textual",

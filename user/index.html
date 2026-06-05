@@ -668,6 +668,18 @@ must-tui
 <h2 id="python-repl-helpers">Python REPL Helpers<a class="headerlink" href="#python-repl-helpers" title="Permanent link">&para;</a></h2>
 <p>The <code>must_tui.must</code> module provides two helper functions that are
 useful from a Python REPL or scripts.</p>
+<p>In a notebook, prefer the async helpers with <code>await</code> when you can:</p>
+<pre><code class="language-python">from must_tui.must import get_parameter_names_async
+
+matches = await get_parameter_names_async(
+  name_pattern=&quot;nc12.*tsense&quot;,
+  data_provider=&quot;PLATO&quot;,
+  use_cache=True,
+)
+</code></pre>
+<p>The synchronous wrappers, such as <code>get_parameter_names()</code> and
+<code>get_parameter_series()</code>, are still available for plain scripts and will also
+work in notebooks through an internal bridge.</p>
 <h3 id="get_parameter_names"><code>get_parameter_names()</code><a class="headerlink" href="#get_parameter_names" title="Permanent link">&para;</a></h3>
 <p>Use this function to search parameter names and descriptions.</p>
 <pre><code class="language-python">from must_tui.must import get_parameter_names

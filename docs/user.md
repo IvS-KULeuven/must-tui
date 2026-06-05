@@ -63,6 +63,22 @@ must-tui
 The `must_tui.must` module provides two helper functions that are
 useful from a Python REPL or scripts.
 
+In a notebook, prefer the async helpers with `await` when you can:
+
+```python
+from must_tui.must import get_parameter_names_async
+
+matches = await get_parameter_names_async(
+  name_pattern="nc12.*tsense",
+  data_provider="PLATO",
+  use_cache=True,
+)
+```
+
+The synchronous wrappers, such as `get_parameter_names()` and
+`get_parameter_series()`, are still available for plain scripts and will also
+work in notebooks through an internal bridge.
+
 ### `get_parameter_names()`
 
 Use this function to search parameter names and descriptions.

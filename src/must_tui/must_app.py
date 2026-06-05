@@ -11,9 +11,11 @@ from whenever import PlainDateTime
 from egse.env import bool_env
 from textual import log, on, work
 from textual.app import App, ComposeResult
+from textual.css.query import NoMatches
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.reactive import var
+from textual.screen import Screen
 from textual.events import MouseScrollDown, MouseScrollUp, MouseDown, MouseUp, MouseMove
 from textual.widgets import Button, Checkbox, DataTable, Footer, Header, Input, OptionList, Static
 from textual_plotext import PlotextPlot as PlotWidget
@@ -283,6 +285,41 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         log.debug(f"Dragging with mouse: {event=}")
 
 
+class LoadingScreen(Screen[None]):
+    def compose(self) -> ComposeResult:
+        with Vertical(id="loading-dialog"):
+            yield Static("MUST TUI", id="loading-title")
+            yield Static("", id="loading-status")
+            yield Static("Please wait…", id="loading-subtitle")
+
+    def set_status(self, message: str) -> None:
+        try:
+            self.query_one("#loading-status", Static).update(message)
+        except Exception:
+            pass
+
+
+class MainScreen(Screen[None]):
+    def compose(self) -> ComposeResult:
+        app = cast(Any, self.app)
+        yield Header()
+        with Horizontal(id="input-container"):
+            yield Input(placeholder="Search for a match...", id="input-search")
+            yield Checkbox(label="Regex", value=True, id="regex-checkbox")
+        with Horizontal(id="main-container"):
+            yield OptionList(*app.options)
+            with Vertical():
+                with Horizontal(id="info-container"):
+                    yield ParameterInfo()
+                    yield ParameterMetadata()
+                with Horizontal(id="plot-controls"):
+                    yield Button("Clear Plot", id="bt-plot-clear")
+                    yield Button("Plot: TUI", id="bt-plot-backend")
+                    yield DateTimeRangePicker(app.time_range.start, app.time_range.end, id="datetime-range-picker")
+                yield app.plot_widget
+        yield Footer()
+
+
 class MUSTApp(App[None]):
     CSS_PATH = "must_app.tcss"
     DATA_PROVIDER = "PLATO"
@@ -323,51 +360,64 @@ class MUSTApp(App[None]):
         self.plot_backend = "textual"
         self.time_range = TimeRange(start=PlainDateTime(2025, 12, 2), end=PlainDateTime(2025, 12, 5))
 
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with Horizontal(id="input-container"):
-            yield Input(placeholder="Search for a match...", id="input-search")
-            yield Checkbox(label="Regex", value=True, id="regex-checkbox")
-        with Horizontal(id="main-container"):
-            yield OptionList(*self.options)
-            with Vertical():
-                with Horizontal(id="info-container"):
-                    yield ParameterInfo()
-                    yield ParameterMetadata()
-                with Horizontal(id="plot-controls"):
-                    yield Button("Clear Plot", id="bt-plot-clear")
-                    yield Button("Plot: TUI", id="bt-plot-backend")
-                    yield DateTimeRangePicker(self.time_range.start, self.time_range.end, id="datetime-range-picker")
-                yield self.plot_widget
-        yield Footer()
-
     async def on_mount(self) -> None:
-        self.must_ctx = await login()
-        if self.must_ctx.authenticated:
-            log.info("MUST context authenticated successfully.")
-        else:
-            log.error("MUST context authentication failed.")
-            self.call_later(self.show_error_dialog, "Failed to authenticate with the MUST server.")
+        self.install_screen(LoadingScreen(), name="loading")
+        self.push_screen("loading")
+        asyncio.create_task(self._initialize_and_show_main_screen())
+
+    def _set_loading_status(self, message: str) -> None:
+        if isinstance(self.screen, LoadingScreen):
+            self.screen.set_status(message)
+
+    async def _initialize_and_show_main_screen(self) -> None:
+        try:
+            self._set_loading_status("Authenticating with MUST server…")
+            self.must_ctx = await login()
+            if self.must_ctx.authenticated:
+                log.info("MUST context authenticated successfully.")
+            else:
+                log.error("MUST context authentication failed.")
+                self.call_later(self.show_error_dialog, "Failed to authenticate with the MUST server.")
+
+            self._set_loading_status("Loading MIB parameter info…")
+            try:
+                pcf_path = importlib.resources.files("must_tui").joinpath("data/mib/pcf.dat")
+                pcf_content = await read_pcf(pcf_path)
+                self.pars_info = pcf_content.get("pcf", {})
+                log.info(f"Loaded {len(self.pars_info)} MIB entries from pcf.dat for ParameterInfo enrichment.")
+            except Exception as exc:
+                self.pars_info = {}
+                log.warning(f"Could not load optional pcf.dat for ParameterInfo enrichment: {exc}")
+
+            self._set_loading_status("Loading parameter catalog…")
+            catalog = await load_parameter_catalog_async(data_provider=self.DATA_PROVIDER, ctx=self.must_ctx)
+            self._apply_parameter_catalog(catalog)
+
+            self.plot_widget.set_context(self.must_ctx)
+            self.matplotlib_plotter.set_context(self.must_ctx)
+        finally:
+            self.install_screen(MainScreen(), name="main")
+            self.switch_screen("main")
+            self._update_plot_backend_button()
+
+            if self.must_ctx.authenticated and self.options:
+                asyncio.create_task(self.refresh_parameter_catalog(force_refresh=True))
+
+    def _main_screen_active(self) -> bool:
+        return isinstance(self.screen, MainScreen)
+
+    def _get_main_controls(self) -> tuple[Input, OptionList] | None:
+        """Return main-screen controls once they are mounted and queryable."""
+        if not self._main_screen_active():
+            return None
 
         try:
-            pcf_path = importlib.resources.files("must_tui").joinpath("data/mib/pcf.dat")
-            pcf_content = await read_pcf(pcf_path)
-            self.pars_info = pcf_content.get("pcf", {})
-            log.info(f"Loaded {len(self.pars_info)} MIB entries from pcf.dat for ParameterInfo enrichment.")
-        except Exception as exc:
-            self.pars_info = {}
-            log.warning(f"Could not load optional pcf.dat for ParameterInfo enrichment: {exc}")
+            search_input = self.screen.query_one("#input-search", Input)
+            option_list = self.screen.query_one(OptionList)
+        except NoMatches:
+            return None
 
-        catalog = await load_parameter_catalog_async(data_provider=self.DATA_PROVIDER, ctx=self.must_ctx)
-        self._apply_parameter_catalog(catalog)
-
-        self.query_one(TimeRangePlotter).set_context(self.must_ctx)
-        self.matplotlib_plotter.set_context(self.must_ctx)
-
-        self._update_plot_backend_button()
-
-        if self.must_ctx.authenticated and self.options:
-            asyncio.create_task(self.refresh_parameter_catalog(force_refresh=True))
+        return search_input, option_list
 
     def _apply_parameter_catalog(self, catalog: dict[str, dict[str, str]]) -> None:
         self.pars_catalog = catalog
@@ -381,12 +431,14 @@ class MUSTApp(App[None]):
             self.pars_mapping[label] = mib_name
 
         self.options = sorted(self.pars_mapping.keys())
-        if self.is_mounted:
-            search = self.query_one(Input).value
+        controls = self._get_main_controls()
+        if controls is not None:
+            search_input, option_list = controls
+            search = search_input.value
             if search == "":
-                self.query_one(OptionList).set_options(self.options)
+                option_list.set_options(self.options)
             elif self.jump:
-                self.query_one(OptionList).set_options(self.options)
+                option_list.set_options(self.options)
                 self.jump_to_item()
             else:
                 self.filter_items()
@@ -408,10 +460,13 @@ class MUSTApp(App[None]):
         return can_open_matplotlib_window()
 
     def _update_plot_backend_button(self) -> None:
-        if not self.is_mounted:
+        if not self.is_mounted or not self._main_screen_active():
             return
 
-        button = self.query_one("#bt-plot-backend", Button)
+        try:
+            button = self.screen.query_one("#bt-plot-backend", Button)
+        except NoMatches:
+            return
         button.label = "Plot: Matplotlib" if self.plot_backend == "matplotlib" else "Plot: TUI"
 
     def _enable_matplotlib_backend(self) -> None:
@@ -464,6 +519,9 @@ class MUSTApp(App[None]):
 
     @on(Button.Pressed, "#bt-plot-backend")
     def toggle_plot_backend(self, event) -> None:
+        if not self._main_screen_active():
+            return
+
         if self.plot_backend == "matplotlib":
             self._disable_matplotlib_backend()
         else:
@@ -510,9 +568,13 @@ class MUSTApp(App[None]):
         # self.plot_widget.replot()
 
     def action_toggle_jump(self) -> None:
+        controls = self._get_main_controls()
+        if controls is None:
+            return
+
         self.jump = not self.jump
         mode = "Jump" if self.jump else "Filter"
-        self.query_one(Input).placeholder = f"Search Mode: {mode}"
+        controls[0].placeholder = f"Search Mode: {mode}"
 
     def action_refresh_parameter_cache(self) -> None:
         asyncio.create_task(self.refresh_parameter_catalog(force_refresh=True))
@@ -523,12 +585,18 @@ class MUSTApp(App[None]):
 
     @on(Checkbox.Changed, "#regex-checkbox")
     def toggle_regex(self, event: Checkbox.Changed) -> None:
+        if not self._main_screen_active():
+            return
+
         log.debug(f"Regex checkbox changed: {event.value=}")
         self.fuzz = not event.value
         self.filter_items()
 
     @on(Input.Changed)
     def filter(self, event: Input.Changed) -> None:
+        if not self._main_screen_active():
+            return
+
         if self.jump:
             self.jump_to_item()
         else:
@@ -536,38 +604,62 @@ class MUSTApp(App[None]):
 
     @on(OptionList.OptionSelected)
     async def show_parameter_info(self, event: OptionList.OptionSelected) -> None:
+        if not self._main_screen_active():
+            return
+
         log.debug(f"{event.option=}")
         par_name = event.option.prompt
         mib_name = self.pars_mapping.get(par_name)
         log.debug(f"{par_name=}, {mib_name=}")
+        try:
+            parameter_info = self.screen.query_one(ParameterInfo)
+        except NoMatches:
+            return
+
         if mib_name and mib_name in self.pars_info:
-            await self.query_one(ParameterInfo).update_info(mib_name, self.pars_info[mib_name])
+            await parameter_info.update_info(mib_name, self.pars_info[mib_name])
         else:
             fallback_name = mib_name if isinstance(mib_name, str) and mib_name else str(par_name)
-            await self.query_one(ParameterInfo).update_info(fallback_name, {})
+            await parameter_info.update_info(fallback_name, {})
 
     @on(OptionList.OptionSelected)
     async def show_parameter_metadata(self, event: OptionList.OptionSelected) -> None:
+        if not self._main_screen_active():
+            return
+
         log.debug(f"{event.option=}")
         par_name = event.option.prompt
         mib_name = self.pars_mapping.get(par_name)
         log.debug(f"{par_name=}, {mib_name=}")
         if mib_name:
             metadata = await get_parameter_metadata(self.must_ctx, mib_name)
-            await self.query_one(ParameterMetadata).update_metadata(mib_name, metadata[0] if metadata else {})
+            try:
+                parameter_metadata = self.screen.query_one(ParameterMetadata)
+            except NoMatches:
+                return
+            await parameter_metadata.update_metadata(mib_name, metadata[0] if metadata else {})
             self.post_message(ParameterSelected(mib_name))
 
     def jump_to_item(self) -> None:
-        search = self.query_one(Input).value
+        controls = self._get_main_controls()
+        if controls is None:
+            return
+
+        search_input, option_list = controls
+        search = search_input.value
         result = process.extractOne(search, self.options)
         if result:
             best_match = result[0]
             idx = self.options.index(best_match)
-            self.query_one(OptionList).highlighted = idx
+            option_list.highlighted = idx
 
     def filter_items(self) -> None:
-        search = self.query_one(Input).value
-        option_list = self.query_one(OptionList)
+        controls = self._get_main_controls()
+        if controls is None:
+            return
+
+        search_input, option_list = controls
+        search = search_input.value
         option_list.clear_options()
         if search == "":
             option_list.set_options(self.options)
@@ -588,9 +680,11 @@ class MUSTApp(App[None]):
     def watch_marker(self) -> None:
         """React to the marker type being changed."""
         self.sub_title = self.MARKERS[self.marker]
-        self.query_one(TimeRangePlotter).marker = self.marker
+        # The marker reactive watcher can run before the main screen is active.
+        # Update the persistent widget instance directly instead of querying the DOM.
+        self.plot_widget.marker = self.marker
         self.matplotlib_plotter.marker = self.marker
-        if self.plot_backend == "matplotlib":
+        if self.plot_backend == "matplotlib" and self._main_screen_active():
             self.matplotlib_plotter.replot()
 
     def action_marker(self) -> None:
@@ -598,6 +692,9 @@ class MUSTApp(App[None]):
         self.marker = next(self.markers)
 
     def action_toggle_plot_backend(self) -> None:
+        if not self._main_screen_active():
+            return
+
         if self.plot_backend == "matplotlib":
             self._disable_matplotlib_backend()
         else:

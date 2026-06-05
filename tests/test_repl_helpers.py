@@ -41,6 +41,20 @@ def test_get_parameter_names_wrapper_uses_asyncio_run(monkeypatch):
     assert result == {"A": "desc"}
 
 
+def test_get_parameter_names_wrapper_works_inside_running_loop(monkeypatch):
+    async def fake_get_parameter_names_async(name_pattern, data_provider=None, use_cache=True):
+        return {"INSIDE_LOOP": "ok"}
+
+    monkeypatch.setattr(must, "get_parameter_names_async", fake_get_parameter_names_async)
+
+    async def invoke_wrapper_inside_loop():
+        return must.get_parameter_names("anything")
+
+    result = asyncio.run(invoke_wrapper_inside_loop())
+
+    assert result == {"INSIDE_LOOP": "ok"}
+
+
 def test_get_parameter_series_wrapper_uses_asyncio_run(monkeypatch):
     def fake_run(coro):
         assert inspect.iscoroutine(coro)

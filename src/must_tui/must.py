@@ -1,10 +1,13 @@
 from dataclasses import dataclass, field
 import asyncio
+from collections.abc import Callable, Coroutine
+from concurrent.futures import ThreadPoolExecutor
 import datetime
 import json
 import os
 from pathlib import Path
 import re
+from typing import Any, TypeVar
 from urllib.parse import urlencode
 
 import aiohttp
@@ -16,6 +19,21 @@ from must_tui.parameter_cache import load_parameter_cache_rows, reset_parameter_
 VERBOSE_DEBUG = bool_env("VERBOSE_DEBUG", default=False)
 
 _PARAMETER_CATALOG_CACHE: dict[str, dict[str, dict[str, str]]] = {}
+_T = TypeVar("_T")
+
+
+def _run_async_blocking(coro_factory: Callable[[], Coroutine[Any, Any, _T]]) -> _T:
+    """Run an async coroutine from sync code, including inside notebook event loops."""
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro_factory())
+
+    # Jupyter and other REPLs often run an event loop already.
+    # Run the coroutine in an isolated loop on a worker thread.
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        return executor.submit(lambda: asyncio.run(coro_factory())).result()
 
 
 # FIXME: use the code from egse.system when the new version of cgse-common is released.
@@ -336,7 +354,9 @@ def load_parameter_catalog(
 ) -> dict[str, dict[str, str]]:
     """Blocking convenience wrapper for `load_parameter_catalog_async()`."""
 
-    return asyncio.run(load_parameter_catalog_async(data_provider=data_provider, force_refresh=force_refresh))
+    return _run_async_blocking(
+        lambda: load_parameter_catalog_async(data_provider=data_provider, force_refresh=force_refresh)
+    )
 
 
 async def load_parameter_cache_async(
@@ -356,7 +376,9 @@ def load_parameter_cache(
 ) -> dict[str, str]:
     """Blocking convenience wrapper for `load_parameter_cache_async()`."""
 
-    return asyncio.run(load_parameter_cache_async(data_provider=data_provider, force_refresh=force_refresh))
+    return _run_async_blocking(
+        lambda: load_parameter_cache_async(data_provider=data_provider, force_refresh=force_refresh)
+    )
 
 
 def reset_parameter_cache(data_provider: str | None = None) -> None:
@@ -430,7 +452,9 @@ def get_parameter_names(
     This is a blocking convenience wrapper around `get_parameter_names_async()`.
     """
 
-    return asyncio.run(get_parameter_names_async(name_pattern, data_provider=data_provider, use_cache=use_cache))
+    return _run_async_blocking(
+        lambda: get_parameter_names_async(name_pattern, data_provider=data_provider, use_cache=use_cache)
+    )
 
 
 def _to_parameter_name_list(parameter_names: str | list[str]) -> list[str]:
@@ -525,8 +549,8 @@ def get_parameter_series(
 ) -> dict[str, list[tuple[datetime.datetime, float | int]]]:
     """Blocking convenience wrapper for `get_parameter_series_async()`."""
 
-    return asyncio.run(
-        get_parameter_series_async(
+    return _run_async_blocking(
+        lambda: get_parameter_series_async(
             parameter_names=parameter_names,
             data_provider=data_provider,
             start=start,

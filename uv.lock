@@ -2527,6 +2527,7 @@ pcot = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "pytest" },
     { name = "textual-dev" },
 ]
 
@@ -2553,7 +2554,10 @@ requires-dist = [
 provides-extras = ["pcot", "docs"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "textual-dev", specifier = ">=1.8.0" }]
+dev = [
+    { name = "pytest", specifier = ">=8.4.0" },
+    { name = "textual-dev", specifier = ">=1.8.0" },
+]
 
 [[package]]
 name = "narwhals"

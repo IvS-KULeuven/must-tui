@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+from urllib.parse import urlencode
 
 import aiohttp
 from egse.log import logging, logger
@@ -432,6 +433,109 @@ def get_parameter_names(
     return asyncio.run(get_parameter_names_async(name_pattern, data_provider=data_provider, use_cache=use_cache))
 
 
+def _to_parameter_name_list(parameter_names: str | list[str]) -> list[str]:
+    if isinstance(parameter_names, str):
+        return [parameter_names]
+    return [name for name in parameter_names if isinstance(name, str) and name]
+
+
+def _normalize_time_range_arg(value: str | datetime.datetime | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, datetime.datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    return value
+
+
+async def get_parameter_series_async(
+    parameter_names: str | list[str],
+    data_provider: str,
+    start: str | datetime.datetime | None = None,
+    end: str | datetime.datetime | None = None,
+    ctx: MustContext | None = None,
+) -> dict[str, list[tuple[datetime.datetime, float | int]]]:
+    """Retrieve `(timestamp, value)` samples for one or more parameters.
+
+    This is a REPL-friendly helper around `get_parameter_data()`. If `start`
+    and `end` are omitted, the full available range is requested.
+
+    Args:
+        parameter_names (str | list[str]): One parameter name or a list of
+            parameter names.
+        data_provider (str): The MUST data provider name.
+        start (str | datetime.datetime | None): Optional start time.
+        end (str | datetime.datetime | None): Optional end time.
+        ctx (MustContext | None): Optional authenticated MUST context.
+
+    Returns:
+        A dictionary keyed by parameter name with a list of `(timestamp, value)`
+        tuples.
+    """
+
+    async def resolve_time_bounds(par_name: str) -> tuple[str, str]:
+        metadata_matches = await search_parameter_metadata(must_ctx, data_provider, par_name, "name")
+        metadata = next((item for item in metadata_matches if item.get("name") == par_name), {})
+
+        first_sample = metadata.get("first-sample")
+        last_sample = metadata.get("last-sample")
+
+        resolved_start = start_str if start_str else (first_sample if isinstance(first_sample, str) else "")
+        resolved_end = end_str if end_str else (last_sample if isinstance(last_sample, str) else "")
+        return resolved_start, resolved_end
+
+    ctx = ctx or await login()
+    if not ctx.authenticated:
+        return {}
+    must_ctx: MustContext = ctx
+
+    names = _to_parameter_name_list(parameter_names)
+    if not names:
+        return {}
+
+    start_str = _normalize_time_range_arg(start)
+    end_str = _normalize_time_range_arg(end)
+
+    result: dict[str, list[tuple[datetime.datetime, float | int]]] = {}
+
+    for par_name in names:
+        resolved_start, resolved_end = await resolve_time_bounds(par_name)
+        samples: list[tuple[datetime.datetime, float | int]] = []
+        async for chunk in get_parameter_data(
+            must_ctx,
+            data_provider,
+            par_name,
+            resolved_start,
+            resolved_end,
+            paginated=True,
+        ):
+            timestamps, values = get_raw_data_with_timestamp(chunk)
+            samples.extend(zip(timestamps, values))
+
+        result[par_name] = samples
+
+    return result
+
+
+def get_parameter_series(
+    parameter_names: str | list[str],
+    data_provider: str,
+    start: str | datetime.datetime | None = None,
+    end: str | datetime.datetime | None = None,
+    ctx: MustContext | None = None,
+) -> dict[str, list[tuple[datetime.datetime, float | int]]]:
+    """Blocking convenience wrapper for `get_parameter_series_async()`."""
+
+    return asyncio.run(
+        get_parameter_series_async(
+            parameter_names=parameter_names,
+            data_provider=data_provider,
+            start=start,
+            end=end,
+            ctx=ctx,
+        )
+    )
+
+
 async def get_parameter_data(
     ctx: MustContext, data_provider: str, par_name: str, start: str, end: str, paginated: bool = False
 ):
@@ -509,10 +613,19 @@ async def get_parameter_data(
         if count > page_count:
             break
 
-        path = (
-            f"/dataproviders/{data_provider}/parameters/data{'/paginated' if paginated else ''}?"
-            f"key=name&values={par_name}&from={start}&to={end}&limit=1000&cursor={cursor}"
-        )
+        query_params: dict[str, str | int] = {
+            "key": "name",
+            "values": par_name,
+            "limit": 1000,
+        }
+        if start:
+            query_params["from"] = start
+        if end:
+            query_params["to"] = end
+        if paginated and cursor:
+            query_params["cursor"] = cursor
+
+        path = f"/dataproviders/{data_provider}/parameters/data{'/paginated' if paginated else ''}?{urlencode(query_params)}"
 
         response = await must_request(ctx, path)
         if VERBOSE_DEBUG:
@@ -524,7 +637,7 @@ async def get_parameter_data(
                 cursor = data.get("cursor")
                 logger.debug(f"{count=}, {cursor=}")
                 yield data.get("content", [])
-                if cursor is None:
+                if cursor in (None, ""):
                     break
             else:
                 yield data

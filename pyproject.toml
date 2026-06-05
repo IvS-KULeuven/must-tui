@@ -55,5 +55,6 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "pytest>=8.4.0",
     "textual-dev>=1.8.0",
 ]

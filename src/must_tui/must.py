@@ -46,50 +46,47 @@ async def login(config_file: Path | None = None):
 
     config_file = config_file or Path.home() / ".config" / "must-tui" / "config.json"
 
-    if not config_file.exists():
-        logger.error(f"Config file {config_file} does not exist.")
+    config: dict = {}
+    if config_file.exists():
+        with open(config_file) as config_fd:
+            config = json.load(config_fd)
+
+    context.base_url = os.getenv("MUST_LINK_BASE_URL", config.get("base_url", ""))
+    if not context.base_url:
+        logger.error("Missing base URL. Set MUST_LINK_BASE_URL or provide base_url in the config file.")
         return context
 
-    with open(config_file) as config_fd:
-        config = json.load(config_fd)
-        context.base_url = os.getenv("MUST_LINK_BASE_URL", config.get("base_url", ""))
-        if not context.base_url:
-            logger.error("Missing base URL. Set MUST_LINK_BASE_URL or provide base_url in the config file.")
-            return context
+    connect_timeout = config.get("connect_timeout", 30)
+    username = os.getenv("MUST_LINK_USERNAME", config.get("username"))
+    password = os.getenv("MUST_LINK_PASSWORD", config.get("password"))
+    if not username or not password:
+        logger.error(
+            "Missing credentials. Set MUST_LINK_USERNAME and MUST_LINK_PASSWORD "
+            "or provide username/password in the config file."
+        )
+        return context
 
-        connect_timeout = config.get("connect_timeout", 30)
-        username = os.getenv("MUST_LINK_USERNAME", config.get("username"))
-        password = os.getenv("MUST_LINK_PASSWORD", config.get("password"))
-        if not username or not password:
-            logger.error(
-                "Missing credentials. Set MUST_LINK_USERNAME and MUST_LINK_PASSWORD "
-                "or provide username/password in the config file."
-            )
-            return context
+    payload = {"username": username, "password": password}
+    header = {"content-type": "application/json"}
 
-        payload = {"username": username, "password": password}
-        header = {"content-type": "application/json"}
-
-        try:
-            async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=60, connect=connect_timeout)
-            ) as session:
-                async with session.post(context.base_url + "/auth/login", json=payload, headers=header) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        context.token = data["token"]
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60, connect=connect_timeout)) as session:
+            async with session.post(context.base_url + "/auth/login", json=payload, headers=header) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    context.token = data["token"]
+                    context.authenticated = True
+                    logger.info("Logged in successfully to MUST link.")
+                else:
+                    if "token" in config:
+                        context.token = config["token"]
                         context.authenticated = True
-                        logger.info("Logged in successfully to MUST link.")
+                        logger.info("Retrieved token from config file.")
                     else:
-                        if "token" in config:
-                            context.token = config["token"]
-                            context.authenticated = True
-                            logger.info("Retrieved token from config file.")
-                        else:
-                            logger.error("Login failed")
-        except (ConnectionError, aiohttp.ClientError) as exc:
-            logger.error(f"ConnectionError: {exc}")
-            return context
+                        logger.error("Login failed")
+    except (ConnectionError, aiohttp.ClientError) as exc:
+        logger.error(f"ConnectionError: {exc}")
+        return context
 
     return context
 

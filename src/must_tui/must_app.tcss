@@ -1,3 +1,36 @@
+LoadingScreen {
+    align: center middle;
+}
+
+#loading-dialog {
+    border: thick $primary 50%;
+    background: $boost;
+    width: 50%;
+    height: 11;
+    padding: 1 2;
+    align: center middle;
+    content-align: center middle;
+}
+
+#loading-title {
+    text-style: bold;
+    content-align: center middle;
+    width: 1fr;
+    margin-bottom: 1;
+}
+
+#loading-status {
+    content-align: center middle;
+    width: 1fr;
+    margin-bottom: 1;
+}
+
+#loading-subtitle {
+    color: $text-muted;
+    content-align: center middle;
+    width: 1fr;
+}
+
 OptionList {
 /*  border: solid green; */
     width: 20%;

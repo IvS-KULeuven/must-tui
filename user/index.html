@@ -392,6 +392,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#python-repl-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python REPL Helpers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Python REPL Helpers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get_parameter_names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_parameter_names()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get_parameter_series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_parameter_series()
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -524,6 +563,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#python-repl-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python REPL Helpers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Python REPL Helpers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get_parameter_names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_parameter_names()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get_parameter_series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_parameter_series()
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -586,6 +664,65 @@ must-tui
 <ul>
 <li>The tool requires network access to the MUST backend.</li>
 <li>Authentication must be configured in your runtime environment.</li>
+</ul>
+<h2 id="python-repl-helpers">Python REPL Helpers<a class="headerlink" href="#python-repl-helpers" title="Permanent link">&para;</a></h2>
+<p>The <code>must_tui.must</code> module provides two helper functions that are
+useful from a Python REPL or scripts.</p>
+<h3 id="get_parameter_names"><code>get_parameter_names()</code><a class="headerlink" href="#get_parameter_names" title="Permanent link">&para;</a></h3>
+<p>Use this function to search parameter names and descriptions.</p>
+<pre><code class="language-python">from must_tui.must import get_parameter_names
+
+matches = get_parameter_names(
+    name_pattern=&quot;nc12.*tsense&quot;,
+    data_provider=&quot;PLATO&quot;,
+    use_cache=True,
+)
+
+for name, description in matches.items():
+    print(name, &quot;-&quot;, description)
+</code></pre>
+<p>Arguments:</p>
+<ul>
+<li><code>name_pattern</code> (<code>str</code>): Case-insensitive regex pattern. If the regex is
+  invalid, the value is treated as a literal string.</li>
+<li><code>data_provider</code> (<code>str | None</code>): Optional provider name. If omitted, all
+  available providers are searched.</li>
+<li><code>use_cache</code> (<code>bool</code>): When <code>True</code> (default), searches the local parameter
+  catalog cache for faster lookups.</li>
+</ul>
+<p>Returns:</p>
+<ul>
+<li><code>dict[str, str]</code>: Mapping of parameter name to description.</li>
+</ul>
+<h3 id="get_parameter_series"><code>get_parameter_series()</code><a class="headerlink" href="#get_parameter_series" title="Permanent link">&para;</a></h3>
+<p>Use this function to retrieve one or more parameter time series.</p>
+<pre><code class="language-python">from datetime import datetime
+from must_tui.must import get_parameter_series
+
+series = get_parameter_series(
+    parameter_names=[&quot;CNLA1022&quot;, &quot;CNLA1023&quot;],
+    data_provider=&quot;PLATO&quot;,
+    start=datetime(2025, 1, 1, 0, 0, 0),
+    end=datetime(2026, 1, 1, 1, 0, 0),
+)
+
+for par_name, samples in series.items():
+    print(par_name, len(samples), &quot;samples&quot;)
+</code></pre>
+<p>Arguments:</p>
+<ul>
+<li><code>parameter_names</code> (<code>str | list[str]</code>): One parameter name or a list of names.</li>
+<li><code>data_provider</code> (<code>str</code>): Provider name used for data retrieval.</li>
+<li><code>start</code> (<code>str | datetime | None</code>): Optional start time.</li>
+<li><code>end</code> (<code>str | datetime | None</code>): Optional end time.</li>
+<li><code>ctx</code> (<code>MustContext | None</code>): Optional authenticated context.</li>
+</ul>
+<p>If <code>start</code> and <code>end</code> are omitted, the helper uses metadata bounds
+(<code>first-sample</code> and <code>last-sample</code>) per parameter.</p>
+<p>Returns:</p>
+<ul>
+<li><code>dict[str, list[tuple[datetime, float | int]]]</code>: Mapping of parameter name to
+  <code>(timestamp, value)</code> samples.</li>
 </ul>
 
 

@@ -19,7 +19,7 @@ from textual.screen import Screen
 from textual.events import MouseScrollDown, MouseScrollUp, MouseDown, MouseUp, MouseMove
 from textual.widgets import Button, Checkbox, DataTable, Footer, Header, Input, OptionList, Static
 from textual_plotext import PlotextPlot as PlotWidget
-from thefuzz import process
+from thefuzz import fuzz
 
 from must_tui.dialogs import ErrorDialog, WarningDialog
 from must_tui.matplotlib_bridge import MatplotlibPlotter, can_open_matplotlib_window
@@ -307,7 +307,7 @@ class MainScreen(Screen[None]):
             yield Input(placeholder="Search for a match...", id="input-search")
             yield Checkbox(label="Regex", value=True, id="regex-checkbox")
         with Horizontal(id="main-container"):
-            yield OptionList(*app.options)
+            yield OptionList(*app.options, markup=False)
             with Vertical():
                 with Horizontal(id="info-container"):
                     yield ParameterInfo()
@@ -424,10 +424,21 @@ class MUSTApp(App[None]):
         self.pars_mapping = {}
 
         for mib_name, metadata in sorted(catalog.items()):
-            label_base = metadata.get("description") or mib_name
-            label = label_base
+            must_description = (metadata.get("description") or "").strip()
+            mib_info = self.pars_info.get(mib_name, {}) if isinstance(self.pars_info, dict) else {}
+            pcf_description = str(mib_info.get("description", "")).strip()
+            pcf_description_2 = str(mib_info.get("description_2", "")).strip()
+
+            # Prefer MUST description unless it is empty or just repeats the name.
+            description = must_description
+            if not description or description.casefold() == mib_name.casefold():
+                description = pcf_description or pcf_description_2
+            if not description:
+                description = "no description"
+
+            label = f"{mib_name} [{description}]"
             if label in self.pars_mapping and self.pars_mapping[label] != mib_name:
-                label = f"{label_base} [{mib_name}]"
+                label = f"{label} ({mib_name})"
             self.pars_mapping[label] = mib_name
 
         self.options = sorted(self.pars_mapping.keys())
@@ -647,11 +658,21 @@ class MUSTApp(App[None]):
 
         search_input, option_list = controls
         search = search_input.value
-        result = process.extractOne(search, self.options)
-        if result:
-            best_match = result[0]
-            idx = self.options.index(best_match)
-            option_list.highlighted = idx
+        if search == "":
+            return
+
+        scores: list[tuple[str, int]] = []
+        for opt in self.options:
+            mib_name = self.pars_mapping.get(opt, "")
+            score = max(fuzz.partial_ratio(search, opt), fuzz.partial_ratio(search, mib_name))
+            scores.append((opt, score))
+
+        if not scores:
+            return
+
+        best_match, _ = max(scores, key=lambda item: item[1])
+        idx = self.options.index(best_match)
+        option_list.highlighted = idx
 
     def filter_items(self) -> None:
         controls = self._get_main_controls()
@@ -665,8 +686,14 @@ class MUSTApp(App[None]):
             option_list.set_options(self.options)
         else:
             if self.fuzz:
-                matches = process.extract(search, self.options, limit=100)
-                matched_options = [match[0] for match in matches if match[1] > 50]
+                scored_options: list[tuple[str, int]] = []
+                for opt in self.options:
+                    mib_name = self.pars_mapping.get(opt, "")
+                    score = max(fuzz.partial_ratio(search, opt), fuzz.partial_ratio(search, mib_name))
+                    scored_options.append((opt, score))
+
+                scored_options.sort(key=lambda item: item[1], reverse=True)
+                matched_options = [opt for opt, score in scored_options[:100] if score > 50]
             else:
                 log.debug(f"Filtering with regex: {search=}")
                 try:
@@ -674,7 +701,9 @@ class MUSTApp(App[None]):
                 except Exception as exc:
                     log.error(f"Invalid regex pattern: {exc}")
                     return
-                matched_options = [opt for opt in self.options if pattern.search(opt)]
+                matched_options = [
+                    opt for opt in self.options if pattern.search(opt) or pattern.search(self.pars_mapping.get(opt, ""))
+                ]
             option_list.set_options(matched_options)
 
     def watch_marker(self) -> None:

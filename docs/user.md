@@ -14,6 +14,12 @@ uv tool install must-tui
 must-tui
 ```
 
+Pass `--config` to use a config file at a non-default location:
+
+```bash
+must-tui --config /path/to/my-config.json
+```
+
 ## Configuration
 
 The application reads MUST link connection settings from environment variables
@@ -22,7 +28,8 @@ with precedence over the config file.
 Configuration precedence:
 
 1. Environment variables
-2. Config file at `~/.config/must-tui/config.json`
+2. Config file specified with `--config <path>`
+3. Config file at `~/.config/must-tui/config.json` (default)
 
 Supported environment variables:
 

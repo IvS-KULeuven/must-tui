@@ -4,6 +4,7 @@ import importlib.resources
 import re
 from dataclasses import dataclass
 from itertools import cycle
+from pathlib import Path
 from typing import Any, cast
 
 from textual_timepiece.pickers import DateTimeRangePicker
@@ -344,8 +345,9 @@ class MUSTApp(App[None]):
     marker: var[str] = var("dot")
     """The marker used for each of the plots."""
 
-    def __init__(self) -> None:
+    def __init__(self, config_file: Path | None = None) -> None:
         super().__init__()
+        self.config_file = config_file
         self.must_ctx: MustContext = MustContext()
         self.pars: dict[str, dict] = {}
         self.pars_info: dict = {}
@@ -372,7 +374,7 @@ class MUSTApp(App[None]):
     async def _initialize_and_show_main_screen(self) -> None:
         try:
             self._set_loading_status("Authenticating with MUST server…")
-            self.must_ctx = await login()
+            self.must_ctx = await login(config_file=self.config_file)
             if self.must_ctx.authenticated:
                 log.info("MUST context authenticated successfully.")
             else:
@@ -453,6 +455,14 @@ class MUSTApp(App[None]):
                 self.jump_to_item()
             else:
                 self.filter_items()
+
+    def _option_search_fields(self, option_label: str) -> tuple[str, str, str]:
+        """Return label, MIB name, and PCF description_2 for searching."""
+
+        mib_name = self.pars_mapping.get(option_label, "")
+        mib_info = self.pars_info.get(mib_name, {}) if isinstance(self.pars_info, dict) else {}
+        description_2 = str(mib_info.get("description_2", ""))
+        return option_label, mib_name, description_2
 
     async def refresh_parameter_catalog(self, force_refresh: bool = False) -> None:
         if not self.must_ctx.authenticated:
@@ -663,8 +673,12 @@ class MUSTApp(App[None]):
 
         scores: list[tuple[str, int]] = []
         for opt in self.options:
-            mib_name = self.pars_mapping.get(opt, "")
-            score = max(fuzz.partial_ratio(search, opt), fuzz.partial_ratio(search, mib_name))
+            label, mib_name, description_2 = self._option_search_fields(opt)
+            score = max(
+                fuzz.partial_ratio(search, label),
+                fuzz.partial_ratio(search, mib_name),
+                fuzz.partial_ratio(search, description_2),
+            )
             scores.append((opt, score))
 
         if not scores:
@@ -688,8 +702,12 @@ class MUSTApp(App[None]):
             if self.fuzz:
                 scored_options: list[tuple[str, int]] = []
                 for opt in self.options:
-                    mib_name = self.pars_mapping.get(opt, "")
-                    score = max(fuzz.partial_ratio(search, opt), fuzz.partial_ratio(search, mib_name))
+                    label, mib_name, description_2 = self._option_search_fields(opt)
+                    score = max(
+                        fuzz.partial_ratio(search, label),
+                        fuzz.partial_ratio(search, mib_name),
+                        fuzz.partial_ratio(search, description_2),
+                    )
                     scored_options.append((opt, score))
 
                 scored_options.sort(key=lambda item: item[1], reverse=True)
@@ -702,7 +720,9 @@ class MUSTApp(App[None]):
                     log.error(f"Invalid regex pattern: {exc}")
                     return
                 matched_options = [
-                    opt for opt in self.options if pattern.search(opt) or pattern.search(self.pars_mapping.get(opt, ""))
+                    opt
+                    for opt in self.options
+                    if any(pattern.search(field) for field in self._option_search_fields(opt))
                 ]
             option_list.set_options(matched_options)
 

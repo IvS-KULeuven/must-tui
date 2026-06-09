@@ -17,3 +17,6 @@ site/
 
 # environment files
 .env
+
+# Scratch area
+scratch/

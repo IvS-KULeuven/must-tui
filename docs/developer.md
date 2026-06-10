@@ -24,8 +24,22 @@ must-tui
 uv run mkdocs serve
 ```
 
+## Publish docs (local deploy)
+
+Publish to GitHub Pages using the local MkDocs deploy command:
+
+```bash
+uv run mkdocs gh-deploy -r upstream -m "Update docs..."
+```
+
+This pushes the generated site to the `gh-pages` branch.
+
 ## Package docs dependencies only
 
 ```bash
 uv sync --extra docs
 ```
+
+## Environment settings
+
+See the dedicated environment documentation in [Environment](env.md), including variable meanings, fallback behavior, and setup examples.

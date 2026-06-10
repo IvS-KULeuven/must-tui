@@ -1,6 +1,6 @@
 site_name: must-tui
 site_description: Documentation for the must-tui project
-site_url: ""
+site_url: https://ivs-kuleuven.github.io/must-tui/
 repo_name: IvS-KULeuven/must-tui
 repo_url: https://github.com/IvS-KULeuven/must-tui
 
@@ -56,5 +56,7 @@ extra_css:
 nav:
   - Home: index.md
   - User Guide: user.md
+  - Using the TUI: usage.md
   - Developer Guide: developer.md
+  - Environment: env.md
   - API Reference: api.md

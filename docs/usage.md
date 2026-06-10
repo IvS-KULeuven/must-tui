@@ -68,13 +68,11 @@ selected parameter.
 | `description_2` | Extended description |
 | `pid` | On-board identifier of the telemetry parameter |
 | `unit` | Engineering unit mnemonic |
-| `decim` | Number of decimal places to be used for displaying real values of
-this monitoring parameter |
+| `decim` | Number of decimal places to be used for displaying real values of this monitoring parameter |
 | `ptc` | Parameter Type Code |
 | `pfc` | Parameter Format Code |
 | `width` | 'Padded' width of this parameter expressed in number of bits |
-| `valid` | Name of the parameter to be used to determine the state validity of
-the parameter specified in this record |
+| `valid` | Name of the parameter to be used to determine the state validity of the parameter specified in this record |
 | `related` | Name of monitoring parameter |
 | `categ` | Calibration category: N=numeric, S=status, T=text |
 | `natur` | Nature of the parameter: R=raw, D=dynamic OL, H=hardcoded, S=save synthetic, C=constant |

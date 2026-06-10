@@ -10,29 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://ivs-kuleuven.github.io/must-tui/">
+        <link rel="canonical" href="https://ivs-kuleuven.github.io/must-tui/env/">
       
       
+        <link rel="prev" href="../developer/">
       
-        <link rel="next" href="user/">
+      
+        <link rel="next" href="../api/">
       
       
         
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>must-tui</title>
+        <title>Environment - must-tui</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,11 +53,11 @@
       
     
     
-      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="stylesheets/api.css">
+      <link rel="stylesheet" href="../stylesheets/api.css">
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -80,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#must-tui-documentation" class="md-skip">
+        <a href="#environment-configuration" class="md-skip">
           Skip to content
         </a>
       
@@ -96,7 +98,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="." title="must-tui" class="md-header__button md-logo" aria-label="must-tui" data-md-component="logo">
+    <a href=".." title="must-tui" class="md-header__button md-logo" aria-label="must-tui" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -116,7 +118,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Home
+              Environment
             
           </span>
         </div>
@@ -232,7 +234,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="." title="must-tui" class="md-nav__button md-logo" aria-label="must-tui" data-md-component="logo">
+    <a href=".." title="must-tui" class="md-nav__button md-logo" aria-label="must-tui" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -259,19 +261,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="." class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -287,7 +280,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -299,7 +291,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user/" class="md-nav__link">
+      <a href="../user/" class="md-nav__link">
         
   
   
@@ -326,7 +318,7 @@
   
   
     <li class="md-nav__item">
-      <a href="developer/" class="md-nav__link">
+      <a href="../developer/" class="md-nav__link">
         
   
   
@@ -350,10 +342,37 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="env/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -369,6 +388,103 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#supported-environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported environment variables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resolution-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolution behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-temporary-shell-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: temporary shell session
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-add-to-your-shell-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: add to your shell profile
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-config-file-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: config-file fallback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-custom-cache-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: custom cache location
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -380,7 +496,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api/" class="md-nav__link">
+      <a href="../api/" class="md-nav__link">
         
   
   
@@ -420,6 +536,91 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#supported-environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported environment variables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resolution-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolution behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-temporary-shell-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: temporary shell session
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-add-to-your-shell-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: add to your shell profile
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-config-file-fallback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: config-file fallback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-custom-cache-location" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: custom cache location
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -438,14 +639,72 @@
   
 
 
-<h1 id="must-tui-documentation">must-tui Documentation<a class="headerlink" href="#must-tui-documentation" title="Permanent link">&para;</a></h1>
-<p>Welcome to the documentation for <code>must-tui</code>.</p>
-<p>Use this site to find:</p>
+<h1 id="environment-configuration">Environment Configuration<a class="headerlink" href="#environment-configuration" title="Permanent link">&para;</a></h1>
+<p>This page describes environment variables used by must-tui, how they are resolved, and practical setup examples.</p>
+<h2 id="supported-environment-variables">Supported environment variables<a class="headerlink" href="#supported-environment-variables" title="Permanent link">&para;</a></h2>
+<p>must-tui uses the following environment variables:</p>
 <ul>
-<li><a href="user/">User Guide</a>: install, configure, and use the terminal UI.</li>
-<li><a href="developer/">Developer Guide</a>: set up a development environment and contribute.</li>
-<li><a href="api/">API Reference</a>: module-level documentation for the Python package.</li>
+<li><code>MUST_LINK_BASE_URL</code>: Base URL of the MUST link server.</li>
+<li><code>MUST_LINK_USERNAME</code>: Username used for authentication.</li>
+<li><code>MUST_LINK_PASSWORD</code>: Password used for authentication.</li>
+<li><code>VERBOSE_DEBUG</code>: Optional debug toggle (<code>1</code> enables verbose debug logs).</li>
+<li><code>XDG_CACHE_HOME</code>: Root directory for cache files.</li>
 </ul>
+<p><code>XDG</code> stands for <strong>Cross-Desktop Group</strong>. <code>XDG_CACHE_HOME</code> is part of the XDG Base Directory Specification, which defines standard locations for user-specific files such as cache, configuration, and data.</p>
+<h2 id="resolution-behavior">Resolution behavior<a class="headerlink" href="#resolution-behavior" title="Permanent link">&para;</a></h2>
+<p>Credential lookup behavior:</p>
+<ol>
+<li>Read from environment variables.</li>
+<li>If missing, fall back to user config file at <code>~/.config/must-tui/config.json</code>.</li>
+</ol>
+<p>Cache database location:</p>
+<ul>
+<li>If <code>XDG_CACHE_HOME</code> is set:</li>
+<li><code>$XDG_CACHE_HOME/must-tui/parameters.sqlite3</code></li>
+<li>If <code>XDG_CACHE_HOME</code> is not set:</li>
+<li><code>~/.cache/must-tui/parameters.sqlite3</code></li>
+</ul>
+<h2 id="example-temporary-shell-session">Example: temporary shell session<a class="headerlink" href="#example-temporary-shell-session" title="Permanent link">&para;</a></h2>
+<pre><code class="language-bash">export MUST_LINK_BASE_URL=&quot;https://must.example.org&quot;
+export MUST_LINK_USERNAME=&quot;flight-user&quot;
+export MUST_LINK_PASSWORD=&quot;change-me&quot;
+export VERBOSE_DEBUG=1
+export XDG_CACHE_HOME=&quot;$HOME/.cache&quot;
+
+uv run must-tui
+</code></pre>
+<h2 id="example-add-to-your-shell-profile">Example: add to your shell profile<a class="headerlink" href="#example-add-to-your-shell-profile" title="Permanent link">&para;</a></h2>
+<p>Add these lines to <code>~/.zshrc</code> (or equivalent shell profile):</p>
+<pre><code class="language-bash">export MUST_LINK_BASE_URL=&quot;https://must.example.org&quot;
+export MUST_LINK_USERNAME=&quot;flight-user&quot;
+export XDG_CACHE_HOME=&quot;$HOME/.cache&quot;
+</code></pre>
+<p>Then reload your shell:</p>
+<pre><code class="language-bash">source ~/.zshrc
+</code></pre>
+<p>Note: prefer entering secrets securely at runtime or through a secure secrets manager instead of storing passwords in shell profile files.</p>
+<h2 id="example-config-file-fallback">Example: config-file fallback<a class="headerlink" href="#example-config-file-fallback" title="Permanent link">&para;</a></h2>
+<p>If environment variables are not provided, create <code>~/.config/must-tui/config.json</code>:</p>
+<pre><code class="language-json">{
+  &quot;MUST_LINK_BASE_URL&quot;: &quot;https://must.example.org&quot;,
+  &quot;MUST_LINK_USERNAME&quot;: &quot;flight-user&quot;,
+  &quot;MUST_LINK_PASSWORD&quot;: &quot;change-me&quot;
+}
+</code></pre>
+<h2 id="example-custom-cache-location">Example: custom cache location<a class="headerlink" href="#example-custom-cache-location" title="Permanent link">&para;</a></h2>
+<pre><code class="language-bash">export XDG_CACHE_HOME=&quot;$HOME/work-cache&quot;
+uv run must-tui
+</code></pre>
+<p>With this configuration, cache will be stored at:</p>
+<pre><code class="language-text">$HOME/work-cache/must-tui/parameters.sqlite3
+</code></pre>
+<h2 id="quick-checks">Quick checks<a class="headerlink" href="#quick-checks" title="Permanent link">&para;</a></h2>
+<p>Verify variables in the current shell:</p>
+<pre><code class="language-bash">env | grep -E 'MUST_LINK|VERBOSE_DEBUG|XDG_CACHE_HOME'
+</code></pre>
+<p>Check where the cache file should be:</p>
+<pre><code class="language-bash">echo &quot;${XDG_CACHE_HOME:-$HOME/.cache}/must-tui/parameters.sqlite3&quot;
+</code></pre>
 
 
 
@@ -495,10 +754,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": [], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

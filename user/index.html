@@ -10,6 +10,8 @@
       
       
       
+        <link rel="canonical" href="https://ivs-kuleuven.github.io/must-tui/user/">
+      
       
         <link rel="prev" href="..">
       
@@ -473,6 +475,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../api/" class="md-nav__link">
         
   
@@ -630,13 +659,17 @@
 <h2 id="run">Run<a class="headerlink" href="#run" title="Permanent link">&para;</a></h2>
 <pre><code class="language-bash">must-tui
 </code></pre>
+<p>Pass <code>--config</code> to use a config file at a non-default location:</p>
+<pre><code class="language-bash">must-tui --config /path/to/my-config.json
+</code></pre>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <p>The application reads MUST link connection settings from environment variables
 with precedence over the config file.</p>
 <p>Configuration precedence:</p>
 <ol>
 <li>Environment variables</li>
-<li>Config file at <code>~/.config/must-tui/config.json</code></li>
+<li>Config file specified with <code>--config &lt;path&gt;</code></li>
+<li>Config file at <code>~/.config/must-tui/config.json</code> (default)</li>
 </ol>
 <p>Supported environment variables:</p>
 <ul>

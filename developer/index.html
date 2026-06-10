@@ -10,11 +10,13 @@
       
       
       
+        <link rel="canonical" href="https://ivs-kuleuven.github.io/must-tui/developer/">
+      
       
         <link rel="prev" href="../user/">
       
       
-        <link rel="next" href="../api/">
+        <link rel="next" href="../env/">
       
       
         
@@ -409,6 +411,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#publish-docs-local-deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publish docs (local deploy)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#package-docs-dependencies-only" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -419,10 +432,48 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#environment-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment settings
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -514,10 +565,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#publish-docs-local-deploy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publish docs (local deploy)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#package-docs-dependencies-only" class="md-nav__link">
     <span class="md-ellipsis">
       
         Package docs dependencies only
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment settings
       
     </span>
   </a>
@@ -559,9 +632,16 @@ uv sync --extra docs
 <h2 id="build-docs">Build docs<a class="headerlink" href="#build-docs" title="Permanent link">&para;</a></h2>
 <pre><code class="language-bash">uv run mkdocs serve
 </code></pre>
+<h2 id="publish-docs-local-deploy">Publish docs (local deploy)<a class="headerlink" href="#publish-docs-local-deploy" title="Permanent link">&para;</a></h2>
+<p>Publish to GitHub Pages using the local MkDocs deploy command:</p>
+<pre><code class="language-bash">uv run mkdocs gh-deploy
+</code></pre>
+<p>This pushes the generated site to the <code>gh-pages</code> branch.</p>
 <h2 id="package-docs-dependencies-only">Package docs dependencies only<a class="headerlink" href="#package-docs-dependencies-only" title="Permanent link">&para;</a></h2>
 <pre><code class="language-bash">uv sync --extra docs
 </code></pre>
+<h2 id="environment-settings">Environment settings<a class="headerlink" href="#environment-settings" title="Permanent link">&para;</a></h2>
+<p>See the dedicated environment documentation in <a href="../env/">Environment</a>, including variable meanings, fallback behavior, and setup examples.</p>
 
 
 

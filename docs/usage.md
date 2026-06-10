@@ -76,8 +76,8 @@ this monitoring parameter |
 | `valid` | Name of the parameter to be used to determine the state validity of
 the parameter specified in this record |
 | `related` | Name of monitoring parameter |
-| `categ` | Calibration category |
-| `natur` | Nature of the parameter: 'R', 'D', 'P', 'H', 'S', 'C'|
+| `categ` | Calibration category: N=numeric, S=status, T=text |
+| `natur` | Nature of the parameter: R=raw, D=dynamic OL, H=hardcoded, S=save synthetic, C=constant |
 | `curtx` | Parameter calibration identification name |
 | `inter` | Flag controlling extrapolation behavior |
 | `uscon` | |

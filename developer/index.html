@@ -634,7 +634,7 @@ uv sync --extra docs
 </code></pre>
 <h2 id="publish-docs-local-deploy">Publish docs (local deploy)<a class="headerlink" href="#publish-docs-local-deploy" title="Permanent link">&para;</a></h2>
 <p>Publish to GitHub Pages using the local MkDocs deploy command:</p>
-<pre><code class="language-bash">uv run mkdocs gh-deploy
+<pre><code class="language-bash">uv run mkdocs gh-deploy -r upstream -m &quot;Update docs...&quot;
 </code></pre>
 <p>This pushes the generated site to the <code>gh-pages</code> branch.</p>
 <h2 id="package-docs-dependencies-only">Package docs dependencies only<a class="headerlink" href="#package-docs-dependencies-only" title="Permanent link">&para;</a></h2>

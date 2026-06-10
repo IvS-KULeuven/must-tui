@@ -10,6 +10,8 @@ Wrapper behavior:
 get_parameter_names_async:
 - Cache-based matching works (case-insensitive regex)
 - Invalid regex falls back to literal search
+- Also searches PCF description_2 field from the bundled MIB
+- Falls back to MIB description when MUST description is empty or equals the parameter name
 - Non-cache path deduplicates parameter names across providers
 - Result ordering is sorted by parameter name
 
@@ -76,13 +78,65 @@ def test_get_parameter_names_async_uses_cache_with_regex_and_literal_fallback(mo
             "FLAG[a-": "Contains literal bracket sequence",
         }
 
+    async def fake_pcf_loader():
+        return {}
+
     monkeypatch.setattr(must, "load_parameter_cache_async", fake_cache_loader)
+    monkeypatch.setattr(must, "_load_pcf_async", fake_pcf_loader)
 
     regex_result = asyncio.run(must.get_parameter_names_async("temp", use_cache=True))
     literal_result = asyncio.run(must.get_parameter_names_async("[a-", use_cache=True))
 
     assert regex_result == {"TEMP_A": "Primary temperature"}
     assert literal_result == {"FLAG[a-": "Contains literal bracket sequence"}
+
+
+def test_get_parameter_names_async_searches_description_2(monkeypatch):
+    async def fake_cache_loader(data_provider=None, ctx=None, force_refresh=False):
+        return {
+            "MIB_PAR_001": "no description",
+            "MIB_PAR_002": "Voltage monitor",
+        }
+
+    async def fake_pcf_loader():
+        return {
+            "MIB_PAR_001": {"description": "short desc", "description_2": "Camera focus actuator position"},
+        }
+
+    monkeypatch.setattr(must, "load_parameter_cache_async", fake_cache_loader)
+    monkeypatch.setattr(must, "_load_pcf_async", fake_pcf_loader)
+
+    result = asyncio.run(must.get_parameter_names_async("focus actuator", use_cache=True))
+
+    assert "MIB_PAR_001" in result
+    assert "MIB_PAR_002" not in result
+
+
+def test_get_parameter_names_async_falls_back_to_mib_description(monkeypatch):
+    """When MUST description is empty or equals the parameter name, MIB description is returned."""
+
+    async def fake_cache_loader(data_provider=None, ctx=None, force_refresh=False):
+        return {
+            "MIB_PAR_EMPTY": "",           # MUST description empty
+            "MIB_PAR_SAME": "MIB_PAR_SAME",  # MUST description equals name
+            "MIB_PAR_OK": "Good MUST desc",  # MUST description is fine
+        }
+
+    async def fake_pcf_loader():
+        return {
+            "MIB_PAR_EMPTY": {"description": "PCF short", "description_2": "PCF long desc empty"},
+            "MIB_PAR_SAME":  {"description": "PCF short same", "description_2": "PCF long desc same"},
+            "MIB_PAR_OK":    {"description": "PCF ignored", "description_2": "PCF also ignored"},
+        }
+
+    monkeypatch.setattr(must, "load_parameter_cache_async", fake_cache_loader)
+    monkeypatch.setattr(must, "_load_pcf_async", fake_pcf_loader)
+
+    result = asyncio.run(must.get_parameter_names_async("MIB_PAR", use_cache=True))
+
+    assert result["MIB_PAR_EMPTY"] == "PCF short"
+    assert result["MIB_PAR_SAME"] == "PCF short same"
+    assert result["MIB_PAR_OK"] == "Good MUST desc"
 
 
 def test_get_parameter_names_async_without_cache_deduplicates_and_sorts(monkeypatch):

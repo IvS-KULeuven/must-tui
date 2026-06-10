@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] - 2026-06-10
+
+### Changed
+
+- `get_parameter_names` (and its async counterpart) now also searches the PCF `description_2` field from the bundled MIB, matching the search behaviour of the TUI.
+- `get_parameter_names` now returns the MIB description instead of an empty string when the MUST description is absent or merely repeats the parameter name.
+
 ## [0.3.5] - 2026-06-10
 
 ### Added
@@ -56,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LoadingScreen` displayed during application initialization.
 - Status update messages during the login and bootstrap process.
 
+[0.3.6]: https://github.com/IvS-KULeuven/must-tui/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/IvS-KULeuven/must-tui/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/IvS-KULeuven/must-tui/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/IvS-KULeuven/must-tui/compare/v0.3.2...v0.3.3

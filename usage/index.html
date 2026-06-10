@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://ivs-kuleuven.github.io/must-tui/developer/">
+        <link rel="canonical" href="https://ivs-kuleuven.github.io/must-tui/usage/">
       
       
-        <link rel="prev" href="../usage/">
+        <link rel="prev" href="../user/">
       
       
-        <link rel="next" href="../env/">
+        <link rel="next" href="../developer/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Developer Guide - must-tui</title>
+        <title>Using the TUI - must-tui</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#developer-guide" class="md-skip">
+        <a href="#using-the-tui" class="md-skip">
           Skip to content
         </a>
       
@@ -118,7 +118,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Developer Guide
+              Using the TUI
             
           </span>
         </div>
@@ -315,33 +315,6 @@
       
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../usage/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Using the TUI
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
     
   
   
@@ -361,7 +334,7 @@
   <span class="md-ellipsis">
     
   
-    Developer Guide
+    Using the TUI
   
 
     
@@ -379,7 +352,7 @@
   <span class="md-ellipsis">
     
   
-    Developer Guide
+    Using the TUI
   
 
     
@@ -405,10 +378,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#local-setup" class="md-nav__link">
+  <a href="#layout-overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Local setup
+        Layout Overview
       
     </span>
   </a>
@@ -416,10 +389,93 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-the-app" class="md-nav__link">
+  <a href="#panels" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run the app
+        Panels
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Panels">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#search-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search Input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter List
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter Info
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter Metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plot-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot Controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#global-key-bindings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global Key Bindings
       
     </span>
   </a>
@@ -427,46 +483,80 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#build-docs" class="md-nav__link">
+  <a href="#startup-screens" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Build docs
+        Startup Screens
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Startup Screens">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#loading-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading Screen
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#publish-docs-local-deploy" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#main-screen" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Publish docs (local deploy)
+        Main Screen
       
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#package-docs-dependencies-only" class="md-nav__link">
+  <a href="#plot-backends" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Package docs dependencies only
+        Plot Backends
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plot Backends">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tui-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TUI (default)
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#environment-settings" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#matplotlib" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Environment settings
+        Matplotlib
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -474,6 +564,33 @@
   
 </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -559,10 +676,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#local-setup" class="md-nav__link">
+  <a href="#layout-overview" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Local setup
+        Layout Overview
       
     </span>
   </a>
@@ -570,10 +687,93 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-the-app" class="md-nav__link">
+  <a href="#panels" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run the app
+        Panels
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Panels">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#search-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search Input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter List
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter Info
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter Metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plot-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot Controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#global-key-bindings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global Key Bindings
       
     </span>
   </a>
@@ -581,46 +781,80 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#build-docs" class="md-nav__link">
+  <a href="#startup-screens" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Build docs
+        Startup Screens
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Startup Screens">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#loading-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading Screen
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#publish-docs-local-deploy" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#main-screen" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Publish docs (local deploy)
+        Main Screen
       
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#package-docs-dependencies-only" class="md-nav__link">
+  <a href="#plot-backends" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Package docs dependencies only
+        Plot Backends
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plot Backends">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tui-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TUI (default)
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#environment-settings" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#matplotlib" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Environment settings
+        Matplotlib
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -644,31 +878,308 @@
   
 
 
-<h1 id="developer-guide">Developer Guide<a class="headerlink" href="#developer-guide" title="Permanent link">&para;</a></h1>
-<p>This section contains the basic developer workflow.</p>
-<h2 id="local-setup">Local setup<a class="headerlink" href="#local-setup" title="Permanent link">&para;</a></h2>
-<pre><code class="language-bash">git clone https://github.com/IvS-KULeuven/must-tui
-cd must-tui
-uv venv
-source .venv/bin/activate
-uv sync --extra docs
+<h1 id="using-the-tui">Using the TUI<a class="headerlink" href="#using-the-tui" title="Permanent link">&para;</a></h1>
+<p>The MUST TUI launches in a terminal and provides interactive access to telemetry parameters,
+their metadata, and time-series plots.</p>
+<p><img alt="MUSTApp TUI screenshot" src="../images/mustapp-tui.png" /></p>
+<hr />
+<h2 id="layout-overview">Layout Overview<a class="headerlink" href="#layout-overview" title="Permanent link">&para;</a></h2>
+<p>The interface is divided into five main areas:</p>
+<pre><code>┌──────────────────────────────────────────────────────────┐
+│  Header                                                  │
+├──────────────────────────────────────────────────────────┤
+│  Search Input                              [Regex] □     │
+├─────────────────┬────────────────────────────────────────┤
+│                 │  Parameter Info  │  Parameter Metadata │
+│  Parameter List ├──────────────────────────────────────  │
+│                 │  Plot Controls                         │
+│                 ├────────────────────────────────────────┤
+│                 │  Plot                                  │
+├─────────────────┴────────────────────────────────────────┤
+│  Footer (key bindings)                                   │
+└──────────────────────────────────────────────────────────┘
 </code></pre>
-<h2 id="run-the-app">Run the app<a class="headerlink" href="#run-the-app" title="Permanent link">&para;</a></h2>
-<pre><code class="language-bash">must-tui
+<hr />
+<h2 id="panels">Panels<a class="headerlink" href="#panels" title="Permanent link">&para;</a></h2>
+<h3 id="search-input">Search Input<a class="headerlink" href="#search-input" title="Permanent link">&para;</a></h3>
+<p>The search box at the top filters or navigates the parameter list as you type.</p>
+<ul>
+<li><strong>Filter mode</strong> (default): The list is narrowed down to parameters whose name or description
+  match the search text.  By default the search text is treated as a regular expression.
+  Uncheck the <strong>Regex</strong> checkbox to switch to fuzzy matching instead.</li>
+<li><strong>Jump mode</strong>: The full parameter list is kept intact and the best fuzzy match is highlighted.
+  Toggle jump mode with <code>Ctrl+J</code>.</li>
+</ul>
+<p>The <strong>Regex</strong> checkbox (top-right of the search bar) switches between regex and fuzzy matching
+while in filter mode.</p>
+<h3 id="parameter-list">Parameter List<a class="headerlink" href="#parameter-list" title="Permanent link">&para;</a></h3>
+<p>The left panel lists all parameters retrieved from the MUST server for the configured data
+provider.  Each entry is shown as:</p>
+<pre><code>MIBNAME [Description]
 </code></pre>
-<h2 id="build-docs">Build docs<a class="headerlink" href="#build-docs" title="Permanent link">&para;</a></h2>
-<pre><code class="language-bash">uv run mkdocs serve
-</code></pre>
-<h2 id="publish-docs-local-deploy">Publish docs (local deploy)<a class="headerlink" href="#publish-docs-local-deploy" title="Permanent link">&para;</a></h2>
-<p>Publish to GitHub Pages using the local MkDocs deploy command:</p>
-<pre><code class="language-bash">uv run mkdocs gh-deploy -r upstream -m &quot;Update docs...&quot;
-</code></pre>
-<p>This pushes the generated site to the <code>gh-pages</code> branch.</p>
-<h2 id="package-docs-dependencies-only">Package docs dependencies only<a class="headerlink" href="#package-docs-dependencies-only" title="Permanent link">&para;</a></h2>
-<pre><code class="language-bash">uv sync --extra docs
-</code></pre>
-<h2 id="environment-settings">Environment settings<a class="headerlink" href="#environment-settings" title="Permanent link">&para;</a></h2>
-<p>See the dedicated environment documentation in <a href="../env/">Environment</a>, including variable meanings, fallback behavior, and setup examples.</p>
+<p>Scroll through the list with the arrow keys or the mouse.  Press <strong>Enter</strong> (or click) to select
+a parameter — this loads its MIB info, server metadata, and time-series data into the other panels.</p>
+<h3 id="parameter-info">Parameter Info<a class="headerlink" href="#parameter-info" title="Permanent link">&para;</a></h3>
+<p>The upper-centre panel shows technical details read from the <strong>PCF file of the MIB</strong> for the
+selected parameter.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>par_name</code></td>
+<td>MIB parameter name</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>Short mnemonic description</td>
+</tr>
+<tr>
+<td><code>description_2</code></td>
+<td>Extended description</td>
+</tr>
+<tr>
+<td><code>pid</code></td>
+<td>On-board telemetry identifier</td>
+</tr>
+<tr>
+<td><code>unit</code></td>
+<td>Engineering unit mnemonic</td>
+</tr>
+<tr>
+<td><code>decim</code></td>
+<td>Decimation factor</td>
+</tr>
+<tr>
+<td><code>ptc</code></td>
+<td>Parameter Type Code</td>
+</tr>
+<tr>
+<td><code>pfc</code></td>
+<td>Parameter Format Code</td>
+</tr>
+<tr>
+<td><code>width</code></td>
+<td>Bit width</td>
+</tr>
+<tr>
+<td><code>valid</code></td>
+<td>Validity flag</td>
+</tr>
+<tr>
+<td><code>related</code></td>
+<td>Related parameters</td>
+</tr>
+<tr>
+<td><code>categ</code></td>
+<td>Category</td>
+</tr>
+<tr>
+<td><code>natur</code></td>
+<td>Nature</td>
+</tr>
+<tr>
+<td><code>curtx</code></td>
+<td>Current telemetry index</td>
+</tr>
+<tr>
+<td><code>inter</code></td>
+<td>Interpretation</td>
+</tr>
+<tr>
+<td><code>uscon</code></td>
+<td>User context</td>
+</tr>
+<tr>
+<td><code>parval</code></td>
+<td>Parameter value</td>
+</tr>
+<tr>
+<td><code>subsys</code></td>
+<td>Subsystem</td>
+</tr>
+<tr>
+<td><code>valpar</code></td>
+<td>Validity parameter</td>
+</tr>
+<tr>
+<td><code>sptype</code></td>
+<td>Special type</td>
+</tr>
+<tr>
+<td><code>corr</code></td>
+<td>Correlation</td>
+</tr>
+<tr>
+<td><code>obtid</code></td>
+<td>On-board telemetry identifier</td>
+</tr>
+<tr>
+<td><code>darc</code></td>
+<td>Data archive flag</td>
+</tr>
+<tr>
+<td><code>endian</code></td>
+<td>Endianness</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameter-metadata">Parameter Metadata<a class="headerlink" href="#parameter-metadata" title="Permanent link">&para;</a></h3>
+<p>The upper-right panel shows live metadata fetched from the <strong>MUST server</strong> for the selected
+parameter.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>description</code></td>
+<td>Parameter mnemonic from the server</td>
+</tr>
+<tr>
+<td><code>data-type</code></td>
+<td>Data type (e.g. <code>UNSIGNED_SMALL_INT</code>)</td>
+</tr>
+<tr>
+<td><code>first-sample</code></td>
+<td>Timestamp of the earliest available sample</td>
+</tr>
+<tr>
+<td><code>last-sample</code></td>
+<td>Timestamp of the most recent available sample</td>
+</tr>
+<tr>
+<td><code>subsystem</code></td>
+<td>Subsystem (e.g. <code>TM</code>)</td>
+</tr>
+<tr>
+<td><code>id</code></td>
+<td>Internal parameter identifier</td>
+</tr>
+<tr>
+<td><code>unit</code></td>
+<td>Engineering unit</td>
+</tr>
+<tr>
+<td><code>parameter-type</code></td>
+<td>Parameter type</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>MIB name</td>
+</tr>
+<tr>
+<td><code>provider</code></td>
+<td>Data provider name</td>
+</tr>
+</tbody>
+</table>
+<h3 id="plot-controls">Plot Controls<a class="headerlink" href="#plot-controls" title="Permanent link">&para;</a></h3>
+<p>A toolbar between the info panels and the plot area:</p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Clear Plot</strong> button</td>
+<td>Remove all plotted traces</td>
+</tr>
+<tr>
+<td><strong>Plot: TUI / Plot: Matplotlib</strong> button</td>
+<td>Toggle between the built-in TUI plot and an external Matplotlib window</td>
+</tr>
+<tr>
+<td><strong>DateTime range picker</strong></td>
+<td>Set the start and end time for data retrieval and the plot x-axis</td>
+</tr>
+</tbody>
+</table>
+<p>Changing the date-time range immediately updates the x-axis limits.  Selecting a new parameter
+fetches and plots its data for the current time range.</p>
+<h3 id="plot">Plot<a class="headerlink" href="#plot" title="Permanent link">&para;</a></h3>
+<p>The lower-right area renders a time-series plot of the selected parameter(s).  Multiple
+parameters can be overlaid — each new selection adds a trace without clearing previous ones.</p>
+<p>Use the <strong>Clear Plot</strong> button (or press <code>c</code>) to reset the plot.</p>
+<p>The plot marker style can be cycled through four options (Braille, Standard Definition, High
+Definition, Dot) with <code>m</code>.</p>
+<hr />
+<h2 id="global-key-bindings">Global Key Bindings<a class="headerlink" href="#global-key-bindings" title="Permanent link">&para;</a></h2>
+<p>These bindings are available anywhere in the application:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Ctrl+J</code></td>
+<td>Toggle between <strong>Filter</strong> and <strong>Jump</strong> search mode</td>
+</tr>
+<tr>
+<td><code>c</code></td>
+<td>Clear all traces from the plot</td>
+</tr>
+<tr>
+<td><code>p</code></td>
+<td>Toggle plot backend between TUI (built-in) and Matplotlib</td>
+</tr>
+<tr>
+<td><code>r</code></td>
+<td>Soft-refresh the parameter cache (fetches from server, keeps SQLite cache)</td>
+</tr>
+<tr>
+<td><code>Ctrl+R</code></td>
+<td>Hard-reset the parameter cache (wipes SQLite cache, then re-fetches)</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>Toggle light / dark mode</td>
+</tr>
+<tr>
+<td><code>m</code></td>
+<td>Cycle plot marker style (Braille → SD → HD → Dot)</td>
+</tr>
+<tr>
+<td><code>Ctrl+Q</code></td>
+<td>Quit the application</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="startup-screens">Startup Screens<a class="headerlink" href="#startup-screens" title="Permanent link">&para;</a></h2>
+<h3 id="loading-screen">Loading Screen<a class="headerlink" href="#loading-screen" title="Permanent link">&para;</a></h3>
+<p>On startup the app shows a loading screen while it:</p>
+<ol>
+<li>Authenticates with the MUST server.</li>
+<li>Loads MIB parameter info from the bundled <code>pcf.dat</code>.</li>
+<li>Fetches the parameter catalog.</li>
+</ol>
+<p>If authentication fails the app offers the choice to <strong>Abort</strong> or continue in <strong>offline mode</strong>
+(no server data, MIB browsing only).</p>
+<h3 id="main-screen">Main Screen<a class="headerlink" href="#main-screen" title="Permanent link">&para;</a></h3>
+<p>After loading, the main screen is shown with the full parameter list.  A background refresh of
+the parameter catalog runs automatically on first launch.</p>
+<hr />
+<h2 id="plot-backends">Plot Backends<a class="headerlink" href="#plot-backends" title="Permanent link">&para;</a></h2>
+<h3 id="tui-default">TUI (default)<a class="headerlink" href="#tui-default" title="Permanent link">&para;</a></h3>
+<p>The built-in Textual plot renders directly in the terminal.  No graphical session is required.</p>
+<h3 id="matplotlib">Matplotlib<a class="headerlink" href="#matplotlib" title="Permanent link">&para;</a></h3>
+<p>Requires a graphical desktop session with a window manager.  When enabled, an external
+Matplotlib window opens alongside the terminal and stays in sync with the time range and
+parameter selections.  Switch back to the TUI backend with <code>p</code> or the <strong>Plot: TUI</strong> button.</p>
 
 
 

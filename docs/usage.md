@@ -66,27 +66,29 @@ selected parameter.
 | `par_name` | MIB parameter name |
 | `description` | Short mnemonic description |
 | `description_2` | Extended description |
-| `pid` | On-board telemetry identifier |
+| `pid` | On-board identifier of the telemetry parameter |
 | `unit` | Engineering unit mnemonic |
-| `decim` | Decimation factor |
+| `decim` | Number of decimal places to be used for displaying real values of
+this monitoring parameter |
 | `ptc` | Parameter Type Code |
 | `pfc` | Parameter Format Code |
-| `width` | Bit width |
-| `valid` | Validity flag |
-| `related` | Related parameters |
-| `categ` | Category |
-| `natur` | Nature |
-| `curtx` | Current telemetry index |
-| `inter` | Interpretation |
-| `uscon` | User context |
-| `parval` | Parameter value |
-| `subsys` | Subsystem |
-| `valpar` | Validity parameter |
-| `sptype` | Special type |
-| `corr` | Correlation |
-| `obtid` | On-board telemetry identifier |
-| `darc` | Data archive flag |
-| `endian` | Endianness |
+| `width` | 'Padded' width of this parameter expressed in number of bits |
+| `valid` | Name of the parameter to be used to determine the state validity of
+the parameter specified in this record |
+| `related` | Name of monitoring parameter |
+| `categ` | Calibration category |
+| `natur` | Nature of the parameter: 'R', 'D', 'P', 'H', 'S', 'C'|
+| `curtx` | Parameter calibration identification name |
+| `inter` | Flag controlling extrapolation behavior |
+| `uscon` | |
+| `parval` | Raw value for a constant parameter |
+| `subsys` | |
+| `valpar` | Raw value for a validity parameter |
+| `sptype` |  |
+| `corr` | Flag that controls correlation of absolute time parameters |
+| `obtid` | OBT ID |
+| `darc` |  |
+| `endian` | Endianness: 'B' or 'L' |
 
 ### Parameter Metadata
 

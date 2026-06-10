@@ -944,7 +944,7 @@ selected parameter.</p>
 </tr>
 <tr>
 <td><code>pid</code></td>
-<td>On-board telemetry identifier</td>
+<td>On-board identifier of the telemetry parameter</td>
 </tr>
 <tr>
 <td><code>unit</code></td>
@@ -952,7 +952,11 @@ selected parameter.</p>
 </tr>
 <tr>
 <td><code>decim</code></td>
-<td>Decimation factor</td>
+<td>Number of decimal places to be used for displaying real values of</td>
+</tr>
+<tr>
+<td>this monitoring parameter</td>
+<td></td>
 </tr>
 <tr>
 <td><code>ptc</code></td>
@@ -964,67 +968,71 @@ selected parameter.</p>
 </tr>
 <tr>
 <td><code>width</code></td>
-<td>Bit width</td>
+<td>'Padded' width of this parameter expressed in number of bits</td>
 </tr>
 <tr>
 <td><code>valid</code></td>
-<td>Validity flag</td>
+<td>Name of the parameter to be used to determine the state validity of</td>
+</tr>
+<tr>
+<td>the parameter specified in this record</td>
+<td></td>
 </tr>
 <tr>
 <td><code>related</code></td>
-<td>Related parameters</td>
+<td>Name of monitoring parameter</td>
 </tr>
 <tr>
 <td><code>categ</code></td>
-<td>Category</td>
+<td>Calibration category: N=numeric, S=status, T=text</td>
 </tr>
 <tr>
 <td><code>natur</code></td>
-<td>Nature</td>
+<td>Nature of the parameter: R=raw, D=dynamic OL, H=hardcoded, S=save synthetic, C=constant</td>
 </tr>
 <tr>
 <td><code>curtx</code></td>
-<td>Current telemetry index</td>
+<td>Parameter calibration identification name</td>
 </tr>
 <tr>
 <td><code>inter</code></td>
-<td>Interpretation</td>
+<td>Flag controlling extrapolation behavior</td>
 </tr>
 <tr>
 <td><code>uscon</code></td>
-<td>User context</td>
+<td></td>
 </tr>
 <tr>
 <td><code>parval</code></td>
-<td>Parameter value</td>
+<td>Raw value for a constant parameter</td>
 </tr>
 <tr>
 <td><code>subsys</code></td>
-<td>Subsystem</td>
+<td></td>
 </tr>
 <tr>
 <td><code>valpar</code></td>
-<td>Validity parameter</td>
+<td>Raw value for a validity parameter</td>
 </tr>
 <tr>
 <td><code>sptype</code></td>
-<td>Special type</td>
+<td></td>
 </tr>
 <tr>
 <td><code>corr</code></td>
-<td>Correlation</td>
+<td>Flag that controls correlation of absolute time parameters</td>
 </tr>
 <tr>
 <td><code>obtid</code></td>
-<td>On-board telemetry identifier</td>
+<td>OBT ID</td>
 </tr>
 <tr>
 <td><code>darc</code></td>
-<td>Data archive flag</td>
+<td></td>
 </tr>
 <tr>
 <td><code>endian</code></td>
-<td>Endianness</td>
+<td>Endianness: 'B' or 'L'</td>
 </tr>
 </tbody>
 </table>

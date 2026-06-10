@@ -3,6 +3,7 @@ import asyncio
 from collections.abc import Callable, Coroutine
 from concurrent.futures import ThreadPoolExecutor
 import datetime
+import importlib.resources
 import json
 import os
 from pathlib import Path
@@ -19,6 +20,7 @@ from must_tui.parameter_cache import load_parameter_cache_rows, reset_parameter_
 VERBOSE_DEBUG = bool_env("VERBOSE_DEBUG", default=False)
 
 _PARAMETER_CATALOG_CACHE: dict[str, dict[str, dict[str, str]]] = {}
+_PCF_CACHE: dict[str, dict] | None = None
 _T = TypeVar("_T")
 
 
@@ -394,6 +396,25 @@ def reset_parameter_cache(data_provider: str | None = None) -> None:
     reset_parameter_cache_db(data_provider=data_provider)
 
 
+async def _load_pcf_async() -> dict[str, dict]:
+    """Load the bundled PCF data, caching it at module level after the first read."""
+
+    global _PCF_CACHE
+    if _PCF_CACHE is not None:
+        return _PCF_CACHE
+
+    from must_tui.mib import read_pcf
+
+    pcf_path = importlib.resources.files("must_tui").joinpath("data/mib/pcf.dat")
+    try:
+        pcf_content = await read_pcf(pcf_path)
+        _PCF_CACHE = pcf_content.get("pcf", {})
+    except Exception as exc:
+        logger.warning(f"Could not load pcf.dat for description_2 search: {exc}")
+        _PCF_CACHE = {}
+    return _PCF_CACHE
+
+
 async def get_parameter_names_async(
     name_pattern: str,
     data_provider: str | None = None,
@@ -404,20 +425,35 @@ async def get_parameter_names_async(
 
     If a data provider is given, the search is limited to that provider.
     Otherwise the search spans all data providers available in the MUST context.
+
+    The search covers the parameter name, description, and the PCF ``description_2`` field
+    from the bundled MIB.
     """
 
     if use_cache:
         parameters = await load_parameter_cache_async(data_provider=data_provider, ctx=ctx)
+        pcf = await _load_pcf_async()
         try:
             pattern = re.compile(name_pattern, re.IGNORECASE)
         except re.error:
             pattern = re.compile(re.escape(name_pattern), re.IGNORECASE)
 
-        return {
-            name: description
-            for name, description in parameters.items()
-            if pattern.search(name) or pattern.search(description)
-        }
+        result = {}
+        for name, must_description in parameters.items():
+            mib_info = pcf.get(name, {})
+            description_2 = str(mib_info.get("description_2", ""))
+            if not (
+                pattern.search(name)
+                or pattern.search(must_description)
+                or pattern.search(description_2)
+            ):
+                continue
+            if must_description and must_description.casefold() != name.casefold():
+                description = must_description
+            else:
+                description = str(mib_info.get("description", "")).strip() or description_2
+            result[name] = description or must_description
+        return result
 
     ctx = ctx or await login()
     if not ctx.authenticated:

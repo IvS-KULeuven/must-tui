@@ -18,12 +18,14 @@ class ErrorDialog(ModalScreen[bool]):
         error_message: Optional[str] = None,
         ok_label: Optional[str] = "OK",
         cancel_label: Optional[str] = "Cancel",
+        quit_on_ok: bool = False,
     ) -> None:
         super().__init__()
         self._title = title or "Error"
         self._error_message = error_message or "An unexpected error has occurred."
         self._ok_label = ok_label
         self._cancel_label = cancel_label
+        self._quit_on_ok = quit_on_ok
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -38,6 +40,8 @@ class ErrorDialog(ModalScreen[bool]):
         """React to button press."""
 
         if event.button.id == "btn-dialog-ok":
+            if self._quit_on_ok:
+                self.app.exit()
             self.dismiss(True)
             # self.app.query_one("#console-log", ConsoleOutput).write_log_info("You pressed YES...")
         else:

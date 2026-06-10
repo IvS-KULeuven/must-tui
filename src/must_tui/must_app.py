@@ -327,6 +327,7 @@ class MUSTApp(App[None]):
 
     BINDINGS = [
         ("ctrl+j", "toggle_jump", "Toggle Jump Mode"),
+        ("c", "clear_plot", "Clear Plot"),
         ("p", "toggle_plot_backend", "Toggle plot backend"),
         ("r", "refresh_parameter_cache", "Refresh parameter cache"),
         ("ctrl+r", "reset_parameter_cache", "Reset parameter cache"),
@@ -348,6 +349,7 @@ class MUSTApp(App[None]):
     def __init__(self, config_file: Path | None = None) -> None:
         super().__init__()
         self.config_file = config_file
+        self.offline_mode = False
         self.must_ctx: MustContext = MustContext()
         self.pars: dict[str, dict] = {}
         self.pars_info: dict = {}
@@ -372,38 +374,57 @@ class MUSTApp(App[None]):
             self.screen.set_status(message)
 
     async def _initialize_and_show_main_screen(self) -> None:
+        auth_failed = False
+        self._set_loading_status("Authenticating with MUST server…")
+        self.must_ctx = await login(config_file=self.config_file)
+        if self.must_ctx.authenticated:
+            log.info("MUST context authenticated successfully.")
+        else:
+            log.error("MUST context authentication failed.")
+            auth_failed = True
+            self.offline_mode = True
+            self.must_ctx = MustContext()
+            self._set_loading_status("Continuing without WebMUST connection…")
+
+        self._set_loading_status("Loading MIB parameter info…")
         try:
-            self._set_loading_status("Authenticating with MUST server…")
-            self.must_ctx = await login(config_file=self.config_file)
-            if self.must_ctx.authenticated:
-                log.info("MUST context authenticated successfully.")
-            else:
-                log.error("MUST context authentication failed.")
-                self.call_later(self.show_error_dialog, "Failed to authenticate with the MUST server.")
+            pcf_path = importlib.resources.files("must_tui").joinpath("data/mib/pcf.dat")
+            pcf_content = await read_pcf(pcf_path)
+            self.pars_info = pcf_content.get("pcf", {})
+            log.info(f"Loaded {len(self.pars_info)} MIB entries from pcf.dat for ParameterInfo enrichment.")
+        except Exception as exc:
+            self.pars_info = {}
+            log.warning(f"Could not load optional pcf.dat for ParameterInfo enrichment: {exc}")
 
-            self._set_loading_status("Loading MIB parameter info…")
-            try:
-                pcf_path = importlib.resources.files("must_tui").joinpath("data/mib/pcf.dat")
-                pcf_content = await read_pcf(pcf_path)
-                self.pars_info = pcf_content.get("pcf", {})
-                log.info(f"Loaded {len(self.pars_info)} MIB entries from pcf.dat for ParameterInfo enrichment.")
-            except Exception as exc:
-                self.pars_info = {}
-                log.warning(f"Could not load optional pcf.dat for ParameterInfo enrichment: {exc}")
-
-            self._set_loading_status("Loading parameter catalog…")
+        self._set_loading_status("Loading parameter catalog…")
+        if self.offline_mode:
+            catalog = {}
+        else:
             catalog = await load_parameter_catalog_async(data_provider=self.DATA_PROVIDER, ctx=self.must_ctx)
-            self._apply_parameter_catalog(catalog)
+        self._apply_parameter_catalog(catalog)
 
-            self.plot_widget.set_context(self.must_ctx)
-            self.matplotlib_plotter.set_context(self.must_ctx)
-        finally:
-            self.install_screen(MainScreen(), name="main")
-            self.switch_screen("main")
-            self._update_plot_backend_button()
+        self.plot_widget.set_context(self.must_ctx)
+        self.matplotlib_plotter.set_context(self.must_ctx)
 
-            if self.must_ctx.authenticated and self.options:
-                asyncio.create_task(self.refresh_parameter_catalog(force_refresh=True))
+        self.install_screen(MainScreen(), name="main")
+        self.switch_screen("main")
+        self._update_plot_backend_button()
+
+        if auth_failed:
+            should_abort = await self.push_screen_wait(
+                ErrorDialog(
+                    title="[b]An error occurred:[/]",
+                    error_message="Failed to authenticate with the MUST server.",
+                    ok_label="Abort",
+                    cancel_label="Ignore",
+                    quit_on_ok=True,
+                )
+            )
+            if should_abort:
+                return
+
+        if self.must_ctx.authenticated and self.options:
+            asyncio.create_task(self.refresh_parameter_catalog(force_refresh=True))
 
     def _main_screen_active(self) -> bool:
         return isinstance(self.screen, MainScreen)
@@ -739,6 +760,14 @@ class MUSTApp(App[None]):
     def action_marker(self) -> None:
         """Cycle to the next marker type."""
         self.marker = next(self.markers)
+
+    def action_clear_plot(self) -> None:
+        if not self._main_screen_active():
+            return
+
+        self.plot_widget.clear_plot()
+        if self.plot_backend == "matplotlib":
+            self.matplotlib_plotter.clear_plot()
 
     def action_toggle_plot_backend(self) -> None:
         if not self._main_screen_active():

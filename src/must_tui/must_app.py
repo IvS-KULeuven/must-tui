@@ -548,7 +548,7 @@ class MUSTApp(App[None]):
     async def on_datetime_range_changed(self, event: DateTimeRangePicker.Changed) -> None:
         assert event.start is not None and event.end is not None
         log.info(f"DateTimeRangePicker changed: {event.start=} {event.end=}")
-        # Convert to string format 'YYYY-MM-DD HH:MM:SS'
+        self.time_range = TimeRange(start=event.start, end=event.end)
         self.call_later(self.plot_widget.set_xlimits, event.start.py_datetime(), event.end.py_datetime())
         if self.plot_backend == "matplotlib":
             self.call_later(self.matplotlib_plotter.set_xlimits, event.start.py_datetime(), event.end.py_datetime())

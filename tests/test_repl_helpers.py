@@ -15,6 +15,14 @@ get_parameter_names_async:
 - Non-cache path deduplicates parameter names across providers
 - Result ordering is sorted by parameter name
 
+search_parameters_async:
+- Returns NavigableDict items with MUST fields in snake_case and PCF fields prefixed with pcf_
+- Cache path searches name, description, and pcf_description_2
+- Non-cache path also attaches PCF fields
+- Non-cache path deduplicates and sorts by parameter name
+- Blocking wrapper delegates to async implementation
+- Returns empty list when context is not authenticated (non-cache path)
+
 get_parameter_series_async:
 - Uses metadata first/last sample bounds when start/end are omitted
 - Normalizes explicit datetime/string bounds
@@ -244,3 +252,170 @@ def test_get_parameter_series_async_returns_empty_when_not_authenticated():
     result = asyncio.run(must.get_parameter_series_async("P1", "PROVIDER", ctx=ctx))
 
     assert result == {}
+
+
+# ---------------------------------------------------------------------------
+# search_parameters_async / search_parameters
+# ---------------------------------------------------------------------------
+
+
+def test_search_parameters_async_cached_returns_navigable_dict_with_all_fields(monkeypatch):
+    async def fake_catalog_loader(data_provider=None, ctx=None, force_refresh=False):
+        return {
+            "CNAA0001": {
+                "name": "CNAA0001",
+                "description": "Wheel speed",
+                "data-type": "UNSIGNED_SMALL_INT",
+                "first-sample": "2024-01-01 00:00:00",
+                "last-sample": "2024-12-31 23:59:59",
+                "unit": "rpm",
+                "provider": "PROV_A",
+            },
+        }
+
+    async def fake_pcf_loader():
+        return {
+            "CNAA0001": {
+                "description": "Short MIB desc",
+                "description_2": "Reaction wheel A speed",
+                "unit": "rpm",
+                "ptc": "3",
+            },
+        }
+
+    monkeypatch.setattr(must, "load_parameter_catalog_async", fake_catalog_loader)
+    monkeypatch.setattr(must, "_load_pcf_async", fake_pcf_loader)
+
+    result = asyncio.run(must.search_parameters_async("wheel", use_cache=True))
+
+    assert len(result) == 1
+    rec = result[0]
+
+    # MUST fields in snake_case
+    assert rec["name"] == "CNAA0001"
+    assert rec.description == "Wheel speed"
+    assert rec.first_sample == "2024-01-01 00:00:00"
+    assert rec.last_sample == "2024-12-31 23:59:59"
+    assert rec.data_type == "UNSIGNED_SMALL_INT"
+    assert rec.unit == "rpm"
+    assert rec.provider == "PROV_A"
+
+    # PCF fields prefixed with pcf_
+    assert rec.pcf_description == "Short MIB desc"
+    assert rec.pcf_description_2 == "Reaction wheel A speed"
+    assert rec.pcf_unit == "rpm"
+    assert rec.pcf_ptc == "3"
+
+
+def test_search_parameters_async_cached_matches_pcf_description_2(monkeypatch):
+    async def fake_catalog_loader(data_provider=None, ctx=None, force_refresh=False):
+        return {
+            "MIB_PAR_001": {"name": "MIB_PAR_001", "description": "no description", "provider": "P"},
+            "MIB_PAR_002": {"name": "MIB_PAR_002", "description": "Voltage monitor", "provider": "P"},
+        }
+
+    async def fake_pcf_loader():
+        return {
+            "MIB_PAR_001": {"description": "short", "description_2": "Camera focus actuator position"},
+        }
+
+    monkeypatch.setattr(must, "load_parameter_catalog_async", fake_catalog_loader)
+    monkeypatch.setattr(must, "_load_pcf_async", fake_pcf_loader)
+
+    result = asyncio.run(must.search_parameters_async("focus actuator", use_cache=True))
+
+    assert len(result) == 1
+    assert result[0].name == "MIB_PAR_001"
+    assert result[0].pcf_description_2 == "Camera focus actuator position"
+
+
+def test_search_parameters_async_noncached_includes_pcf_fields(monkeypatch):
+    ctx = must.MustContext(authenticated=True, data_providers=[{"name": "PROV"}])
+
+    async def fake_login():
+        return ctx
+
+    async def fake_search_parameter_metadata(current_ctx, provider_name, name_pattern, search_keys):
+        return [{"name": "PAR_X", "description": "Temperature sensor", "first-sample": "2024-01-01 00:00:00", "last-sample": "2024-06-01 00:00:00"}]
+
+    async def fake_pcf_loader():
+        return {
+            "PAR_X": {"description": "Short", "description_2": "Long temperature description", "unit": "degC"},
+        }
+
+    monkeypatch.setattr(must, "login", fake_login)
+    monkeypatch.setattr(must, "search_parameter_metadata", fake_search_parameter_metadata)
+    monkeypatch.setattr(must, "_load_pcf_async", fake_pcf_loader)
+
+    result = asyncio.run(must.search_parameters_async("PAR_X", ctx=ctx, use_cache=False))
+
+    assert len(result) == 1
+    rec = result[0]
+    assert rec.name == "PAR_X"
+    assert rec.first_sample == "2024-01-01 00:00:00"
+    assert rec.pcf_description_2 == "Long temperature description"
+    assert rec.pcf_unit == "degC"
+
+
+def test_search_parameters_async_noncached_deduplicates_and_sorts(monkeypatch):
+    ctx = must.MustContext(authenticated=True, data_providers=[])
+
+    async def fake_login():
+        return ctx
+
+    async def fake_get_all_data_providers(current_ctx):
+        current_ctx.data_providers = [{"name": "B"}, {"name": "A"}]
+        return current_ctx.data_providers
+
+    async def fake_search_parameter_metadata(current_ctx, provider_name, name_pattern, search_keys):
+        if provider_name == "B":
+            return [
+                {"name": "PAR_B", "description": "from-b"},
+                {"name": "PAR_DUP", "description": "first"},
+            ]
+        return [
+            {"name": "PAR_A", "description": "from-a"},
+            {"name": "PAR_DUP", "description": "second"},
+        ]
+
+    async def fake_pcf_loader():
+        return {}
+
+    monkeypatch.setattr(must, "login", fake_login)
+    monkeypatch.setattr(must, "get_all_data_providers", fake_get_all_data_providers)
+    monkeypatch.setattr(must, "search_parameter_metadata", fake_search_parameter_metadata)
+    monkeypatch.setattr(must, "_load_pcf_async", fake_pcf_loader)
+
+    result = asyncio.run(must.search_parameters_async("PAR", use_cache=False))
+
+    assert [r.name for r in result] == ["PAR_A", "PAR_B", "PAR_DUP"]
+    assert result[2].description == "first"
+
+
+def test_search_parameters_async_returns_empty_when_not_authenticated(monkeypatch):
+    ctx = must.MustContext(authenticated=False)
+
+    async def fake_login():
+        return ctx
+
+    monkeypatch.setattr(must, "login", fake_login)
+
+    result = asyncio.run(must.search_parameters_async("PAR", ctx=ctx, use_cache=False))
+
+    assert result == []
+
+
+def test_search_parameters_wrapper_delegates_to_async(monkeypatch):
+    called_with = {}
+
+    async def fake_async(name_pattern, data_provider=None, ctx=None, use_cache=True):
+        called_with["name_pattern"] = name_pattern
+        called_with["use_cache"] = use_cache
+        return []
+
+    monkeypatch.setattr(must, "search_parameters_async", fake_async)
+
+    result = must.search_parameters("temp.*", use_cache=False)
+
+    assert result == []
+    assert called_with == {"name_pattern": "temp.*", "use_cache": False}

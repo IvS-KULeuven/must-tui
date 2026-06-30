@@ -788,6 +788,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#must_tui.must.search_parameters_async" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;search_parameters_async
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#must_tui.must.search_parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;search_parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#must_tui.must.get_parameter_series_async" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1279,6 +1301,28 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;get_parameter_names
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#must_tui.must.search_parameters_async" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;search_parameters_async
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#must_tui.must.search_parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;search_parameters
       
     </span>
   </a>
@@ -2606,6 +2650,8 @@ config file are used.</p>
         <p>Return matched parameter names and descriptions from MUST.</p>
 <p>If a data provider is given, the search is limited to that provider.
 Otherwise the search spans all data providers available in the MUST context.</p>
+<p>The search covers the parameter name, description, and the PCF <code>description_2</code> field
+from the bundled MIB.</p>
 
 
     </div>
@@ -2627,6 +2673,56 @@ Otherwise the search spans all data providers available in the MUST context.</p>
 
         <p>Return matching parameter names and descriptions for use from a Python REPL.</p>
 <p>This is a blocking convenience wrapper around <code>get_parameter_names_async()</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="must_tui.must.search_parameters_async" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">search_parameters_async</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-async"><code>async</code></small>
+  </span>
+
+<a href="#must_tui.must.search_parameters_async" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">search_parameters_async</span><span class="p">(</span><span class="n">name_pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">MustContext</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">use_cache</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">NavigableDict</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Search for parameters matching a pattern, returning all available metadata.</p>
+<p>Returns a list of NavigableDict entries merging MUST server fields and PCF/MIB fields.
+MUST fields use snake_case keys (e.g. <code>first_sample</code>, <code>data_type</code>).
+PCF/MIB fields are all prefixed with <code>pcf_</code> (e.g. <code>pcf_description_2</code>, <code>pcf_unit</code>).</p>
+<p>The result is compatible with <code>pd.DataFrame(result)</code> and supports attribute access
+on individual items (e.g. <code>result[0].first_sample</code>).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="must_tui.must.search_parameters" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">search_parameters</span>
+
+
+<a href="#must_tui.must.search_parameters" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">search_parameters</span><span class="p">(</span><span class="n">name_pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data_provider</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">use_cache</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">NavigableDict</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Search for parameters matching a pattern, returning all available metadata.</p>
+<p>This is a blocking convenience wrapper around <code>search_parameters_async()</code>.</p>
 
 
     </div>

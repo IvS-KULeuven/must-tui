@@ -418,6 +418,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#search_parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        search_parameters()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get_parameter_series" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -643,6 +654,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#search_parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        search_parameters()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get_parameter_series" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -766,6 +788,38 @@ for name, description in matches.items():
 <ul>
 <li><code>dict[str, str]</code>: Mapping of parameter name to description.</li>
 </ul>
+<h3 id="search_parameters"><code>search_parameters()</code><a class="headerlink" href="#search_parameters" title="Permanent link">&para;</a></h3>
+<p>Use this function to search parameters and retrieve all available metadata in one call — richer than <code>get_parameter_names()</code> because it returns structured records instead of a plain name-to-description mapping.</p>
+<pre><code class="language-python">from must_tui.must import search_parameters
+import pandas as pd
+
+results = search_parameters(
+    name_pattern=&quot;nc12.*tsense&quot;,
+    data_provider=&quot;PLATO&quot;,
+    use_cache=True,
+)
+
+# Each result is a NavigableDict — supports attribute access
+for rec in results:
+    print(rec.name, rec.first_sample, rec.pcf_unit)
+
+# Compatible with pandas
+df = pd.DataFrame(results)
+print(df[[&quot;name&quot;, &quot;description&quot;, &quot;first_sample&quot;, &quot;last_sample&quot;, &quot;pcf_description_2&quot;]])
+</code></pre>
+<p>Arguments:</p>
+<ul>
+<li><code>name_pattern</code> (<code>str</code>): Case-insensitive regex pattern matched against parameter name, MUST description, and PCF <code>description_2</code>. If the regex is invalid, the value is treated as a literal string.</li>
+<li><code>data_provider</code> (<code>str | None</code>): Optional provider name. If omitted, all available providers are searched.</li>
+<li><code>use_cache</code> (<code>bool</code>): When <code>True</code> (default), searches the local parameter catalog cache for faster lookups.</li>
+</ul>
+<p>Returns:</p>
+<ul>
+<li><code>list[NavigableDict]</code>: List of records sorted by parameter name. Each record contains:</li>
+<li>MUST server fields in snake_case (e.g. <code>name</code>, <code>description</code>, <code>data_type</code>, <code>first_sample</code>, <code>last_sample</code>, <code>unit</code>, <code>provider</code>)</li>
+<li>PCF/MIB fields prefixed with <code>pcf_</code> (e.g. <code>pcf_description_2</code>, <code>pcf_unit</code>, <code>pcf_ptc</code>)</li>
+</ul>
+<p>The async counterpart <code>search_parameters_async()</code> accepts the same arguments plus an optional <code>ctx</code> (<code>MustContext</code>).</p>
 <h3 id="get_parameter_series"><code>get_parameter_series()</code><a class="headerlink" href="#get_parameter_series" title="Permanent link">&para;</a></h3>
 <p>Use this function to retrieve one or more parameter time series.</p>
 <pre><code class="language-python">from datetime import datetime

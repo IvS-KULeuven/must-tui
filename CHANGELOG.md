@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.7] - 2026-06-30
+
+### Added
+
+- `search_parameters()` and `search_parameters_async()` REPL helpers that search parameters by name, MUST description, or PCF `description_2` and return a list of `NavigableDict` records. Each record merges all MUST server metadata fields (snake_case keys, e.g. `first_sample`) with PCF/MIB fields (prefixed with `pcf_`, e.g. `pcf_description_2`). Results are directly compatible with `pd.DataFrame(result)`.
+- `viz` optional dependency group (`uv sync --extra viz`) adding Plotly for richer visualisation workflows.
+
+### Fixed
+
+- `DateTimeRangePicker` changes in the TUI now correctly persist to `MUSTApp.time_range`, so downstream code and the Matplotlib backend both see the updated time range.
+
 ## [0.3.6] - 2026-06-10
 
 ### Changed
@@ -63,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LoadingScreen` displayed during application initialization.
 - Status update messages during the login and bootstrap process.
 
+[0.3.7]: https://github.com/IvS-KULeuven/must-tui/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/IvS-KULeuven/must-tui/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/IvS-KULeuven/must-tui/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/IvS-KULeuven/must-tui/compare/v0.3.3...v0.3.4

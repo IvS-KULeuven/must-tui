@@ -116,6 +116,43 @@ Returns:
 
 - `dict[str, str]`: Mapping of parameter name to description.
 
+### `search_parameters()`
+
+Use this function to search parameters and retrieve all available metadata in one call — richer than `get_parameter_names()` because it returns structured records instead of a plain name-to-description mapping.
+
+```python
+from must_tui.must import search_parameters
+import pandas as pd
+
+results = search_parameters(
+    name_pattern="nc12.*tsense",
+    data_provider="PLATO",
+    use_cache=True,
+)
+
+# Each result is a NavigableDict — supports attribute access
+for rec in results:
+    print(rec.name, rec.first_sample, rec.pcf_unit)
+
+# Compatible with pandas
+df = pd.DataFrame(results)
+print(df[["name", "description", "first_sample", "last_sample", "pcf_description_2"]])
+```
+
+Arguments:
+
+- `name_pattern` (`str`): Case-insensitive regex pattern matched against parameter name, MUST description, and PCF `description_2`. If the regex is invalid, the value is treated as a literal string.
+- `data_provider` (`str | None`): Optional provider name. If omitted, all available providers are searched.
+- `use_cache` (`bool`): When `True` (default), searches the local parameter catalog cache for faster lookups.
+
+Returns:
+
+- `list[NavigableDict]`: List of records sorted by parameter name. Each record contains:
+  - MUST server fields in snake_case (e.g. `name`, `description`, `data_type`, `first_sample`, `last_sample`, `unit`, `provider`)
+  - PCF/MIB fields prefixed with `pcf_` (e.g. `pcf_description_2`, `pcf_unit`, `pcf_ptc`)
+
+The async counterpart `search_parameters_async()` accepts the same arguments plus an optional `ctx` (`MustContext`).
+
 ### `get_parameter_series()`
 
 Use this function to retrieve one or more parameter time series.

@@ -14,6 +14,7 @@ from urllib.parse import urlencode
 import aiohttp
 from egse.log import logging, logger
 from egse.env import bool_env
+from navdict import NavigableDict
 from must_tui.parameter_cache import load_parameter_cache_rows, reset_parameter_cache_db, store_parameter_cache_rows
 
 # from egse.system import title_to_kebab
@@ -442,11 +443,7 @@ async def get_parameter_names_async(
         for name, must_description in parameters.items():
             mib_info = pcf.get(name, {})
             description_2 = str(mib_info.get("description_2", ""))
-            if not (
-                pattern.search(name)
-                or pattern.search(must_description)
-                or pattern.search(description_2)
-            ):
+            if not (pattern.search(name) or pattern.search(must_description) or pattern.search(description_2)):
                 continue
             if must_description and must_description.casefold() != name.casefold():
                 description = must_description
@@ -490,6 +487,89 @@ def get_parameter_names(
 
     return _run_async_blocking(
         lambda: get_parameter_names_async(name_pattern, data_provider=data_provider, use_cache=use_cache)
+    )
+
+
+def _make_parameter_record(must_metadata: dict[str, str], pcf_info: dict) -> NavigableDict:
+    record: dict[str, Any] = {k.replace("-", "_"): v for k, v in must_metadata.items()}
+    record.update({f"pcf_{k}": v for k, v in pcf_info.items()})
+    return NavigableDict(record)
+
+
+async def search_parameters_async(
+    name_pattern: str,
+    data_provider: str | None = None,
+    ctx: MustContext | None = None,
+    use_cache: bool = True,
+) -> list[NavigableDict]:
+    """Search for parameters matching a pattern, returning all available metadata.
+
+    Returns a list of NavigableDict entries merging MUST server fields and PCF/MIB fields.
+    MUST fields use snake_case keys (e.g. ``first_sample``, ``data_type``).
+    PCF/MIB fields are all prefixed with ``pcf_`` (e.g. ``pcf_description_2``, ``pcf_unit``).
+
+    The result is compatible with ``pd.DataFrame(result)`` and supports attribute access
+    on individual items (e.g. ``result[0].first_sample``).
+    """
+
+    pcf = await _load_pcf_async()
+
+    try:
+        pattern = re.compile(name_pattern, re.IGNORECASE)
+    except re.error:
+        pattern = re.compile(re.escape(name_pattern), re.IGNORECASE)
+
+    if use_cache:
+        catalog = await load_parameter_catalog_async(data_provider=data_provider, ctx=ctx)
+
+        result = []
+        for name, must_metadata in catalog.items():
+            description = must_metadata.get("description", "")
+            mib_info = pcf.get(name, {})
+            description_2 = str(mib_info.get("description_2", ""))
+            if not (pattern.search(name) or pattern.search(description) or pattern.search(description_2)):
+                continue
+            result.append(_make_parameter_record(must_metadata, mib_info))
+        return result
+
+    ctx = ctx or await login()
+    if not ctx.authenticated:
+        return []
+
+    if data_provider is not None:
+        provider_names = [data_provider]
+    else:
+        if not ctx.data_providers:
+            await get_all_data_providers(ctx)
+        provider_names = [provider["name"] for provider in ctx.data_providers]
+
+    seen: dict[str, NavigableDict] = {}
+    for provider_name in provider_names:
+        matches = await search_parameter_metadata(ctx, provider_name, name_pattern, "name,description")
+        for metadata in matches:
+            normalized = _normalize_parameter_metadata(metadata, provider_name)
+            parameter_name = normalized.get("name")
+            if isinstance(parameter_name, str) and parameter_name:
+                seen.setdefault(
+                    parameter_name,
+                    _make_parameter_record(normalized, pcf.get(parameter_name, {})),
+                )
+
+    return [seen[k] for k in sorted(seen)]
+
+
+def search_parameters(
+    name_pattern: str,
+    data_provider: str | None = None,
+    use_cache: bool = True,
+) -> list[NavigableDict]:
+    """Search for parameters matching a pattern, returning all available metadata.
+
+    This is a blocking convenience wrapper around `search_parameters_async()`.
+    """
+
+    return _run_async_blocking(
+        lambda: search_parameters_async(name_pattern, data_provider=data_provider, use_cache=use_cache)
     )
 
 

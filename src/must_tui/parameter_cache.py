@@ -103,6 +103,27 @@ def load_parameter_cache_rows(
         return [json.loads(metadata_json) for (metadata_json,) in cursor.fetchall()]
 
 
+def get_parameter_cache_updated_at(
+    data_provider: str | None = None,
+    db_path: str | Path | None = None,
+) -> datetime | None:
+    """Return when the cache was last refreshed for one provider (or any provider), or None when it is empty."""
+
+    cache_path = get_parameter_cache_db_path(db_path)
+    if not cache_path.exists():
+        return None
+
+    with sqlite3.connect(cache_path) as connection:
+        cursor = connection.cursor()
+        if data_provider is None:
+            cursor.execute("select max(updated_at) from parameters")
+        else:
+            cursor.execute("select max(updated_at) from parameters where provider = ?", (data_provider,))
+        (updated_at,) = cursor.fetchone()
+
+    return datetime.fromisoformat(updated_at) if updated_at else None
+
+
 def reset_parameter_cache_db(
     data_provider: str | None = None,
     db_path: str | Path | None = None,

@@ -323,7 +323,7 @@ async def load_parameter_catalog_async(
         return _PARAMETER_CATALOG_CACHE[cache_key]
 
     if not force_refresh:
-        cached_rows = load_parameter_cache_rows(data_provider=data_provider)
+        cached_rows = await asyncio.to_thread(load_parameter_cache_rows, data_provider=data_provider)
         if cached_rows:
             catalog = _rows_to_parameter_catalog(cached_rows)
             _PARAMETER_CATALOG_CACHE[cache_key] = catalog
@@ -346,7 +346,7 @@ async def load_parameter_catalog_async(
 
     _PARAMETER_CATALOG_CACHE[cache_key] = dict(sorted(catalog.items()))
     if catalog:
-        store_parameter_cache_rows(list(catalog.values()))
+        await asyncio.to_thread(store_parameter_cache_rows, list(catalog.values()))
 
     return _PARAMETER_CATALOG_CACHE[cache_key]
 

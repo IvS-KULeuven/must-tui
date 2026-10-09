@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The parameter list shows at most 500 entries, with a final entry saying how many more matches were left out. Refilling the list with all ~70,000 parameters took seconds on startup, on clearing the search, and on broad searches such as a single letter.
+- Jump mode (`Ctrl+J`) shows a window of up to 500 parameters around the best match instead of the full list.
+- At startup, the parameter catalog is only re-downloaded from the server when the local cache is missing or older than one day (previously on every launch). Press `r` to refresh it manually.
+- Loading the parameter catalog from the SQLite cache and storing a refreshed catalog in it now run in a worker thread instead of on the UI event loop.
+
 ### Fixed
 
 - The Parameter Format Code from the PCF is now stored under the key `pfc` (was `pcf`), so the TUI's ParameterInfo panel shows its value instead of `N/A`. In `search_parameters()` results the field is now `pcf_pfc` (was `pcf_pcf`).

@@ -19,12 +19,14 @@ from textual.reactive import var
 from textual.screen import Screen
 from textual.events import MouseScrollDown, MouseScrollUp, MouseDown, MouseUp, MouseMove
 from textual.widgets import Button, Checkbox, DataTable, Footer, Header, Input, OptionList, Static
+from textual.widgets.option_list import Option
 from textual_plotext import PlotextPlot as PlotWidget
 from thefuzz import fuzz
 
 from must_tui.dialogs import ErrorDialog, WarningDialog
 from must_tui.matplotlib_bridge import MatplotlibPlotter, can_open_matplotlib_window
 from must_tui.mib import read_pcf
+from must_tui.parameter_cache import get_parameter_cache_updated_at
 
 # from textual_plot import HiResMode, PlotWidget
 # from egse.system import title_to_kebab
@@ -51,6 +53,12 @@ PARAMETER_METADATA_FIELDS = """
 
 
 VERBOSE_DEBUG = bool_env("VERBOSE_DEBUG", False)
+
+MAX_VISIBLE_OPTIONS = 500
+"""Maximum number of parameters shown in the option list. Refilling the list with all ~70k parameters takes seconds."""
+
+PARAMETER_CACHE_MAX_AGE = datetime.timedelta(days=1)
+"""The parameter catalog is re-downloaded at startup only when the cache is older than this. Press 'r' to force it."""
 
 
 class ParameterSelected(Message):
@@ -308,7 +316,7 @@ class MainScreen(Screen[None]):
             yield Input(placeholder="Search for a match...", id="input-search")
             yield Checkbox(label="Regex", value=True, id="regex-checkbox")
         with Horizontal(id="main-container"):
-            yield OptionList(*app.options, markup=False)
+            yield OptionList(*app.visible_options(app.options), markup=False)
             with Vertical():
                 with Horizontal(id="info-container"):
                     yield ParameterInfo()
@@ -357,6 +365,7 @@ class MUSTApp(App[None]):
         self.pars_mapping: dict = {}
         self.options: list[str] = sorted(self.pars_mapping.keys())
         self.jump = False
+        self._jump_window_start: int | None = None
         self.fuzz = False
         self.markers = cycle(self.MARKERS.keys())
         self.plot_widget: TimeRangePlotter = TimeRangePlotter(self.must_ctx)
@@ -423,8 +432,14 @@ class MUSTApp(App[None]):
             if should_abort:
                 return
 
-        if self.must_ctx.authenticated and self.options:
+        if self.must_ctx.authenticated and self._parameter_cache_is_stale():
             asyncio.create_task(self.refresh_parameter_catalog(force_refresh=True))
+
+    def _parameter_cache_is_stale(self) -> bool:
+        updated_at = get_parameter_cache_updated_at(data_provider=self.DATA_PROVIDER)
+        if updated_at is None:
+            return True
+        return datetime.datetime.now(datetime.timezone.utc) - updated_at > PARAMETER_CACHE_MAX_AGE
 
     def _main_screen_active(self) -> bool:
         return isinstance(self.screen, MainScreen)
@@ -470,12 +485,22 @@ class MUSTApp(App[None]):
             search_input, option_list = controls
             search = search_input.value
             if search == "":
-                option_list.set_options(self.options)
+                option_list.set_options(self.visible_options(self.options))
             elif self.jump:
-                option_list.set_options(self.options)
                 self.jump_to_item()
             else:
                 self.filter_items()
+
+    @staticmethod
+    def visible_options(matches: list[str]) -> list[str | Option]:
+        """Return at most MAX_VISIBLE_OPTIONS matches, plus a disabled hint when more were left out."""
+
+        if len(matches) <= MAX_VISIBLE_OPTIONS:
+            return list(matches)
+
+        hidden = len(matches) - MAX_VISIBLE_OPTIONS
+        hint = Option(f"… {hidden} more matches, refine the search to see them", disabled=True)
+        return [*matches[:MAX_VISIBLE_OPTIONS], hint]
 
     def _option_search_fields(self, option_label: str) -> tuple[str, str, str]:
         """Return label, MIB name, and PCF description_2 for searching."""
@@ -707,7 +732,19 @@ class MUSTApp(App[None]):
 
         best_match, _ = max(scores, key=lambda item: item[1])
         idx = self.options.index(best_match)
-        option_list.highlighted = idx
+
+        # Show a window of the sorted list around the best match instead of the whole list.
+        # Only refill the list when the best match is not already in the window that is shown.
+        start = self._jump_window_start
+        if not (
+            start is not None
+            and 0 <= idx - start < option_list.option_count
+            and option_list.get_option_at_index(idx - start).prompt == best_match
+        ):
+            start = max(0, min(idx - MAX_VISIBLE_OPTIONS // 2, len(self.options) - MAX_VISIBLE_OPTIONS))
+            option_list.set_options(self.options[start : start + MAX_VISIBLE_OPTIONS])
+            self._jump_window_start = start
+        option_list.highlighted = idx - start
 
     def filter_items(self) -> None:
         controls = self._get_main_controls()
@@ -718,7 +755,7 @@ class MUSTApp(App[None]):
         search = search_input.value
         option_list.clear_options()
         if search == "":
-            option_list.set_options(self.options)
+            option_list.set_options(self.visible_options(self.options))
         else:
             if self.fuzz:
                 scored_options: list[tuple[str, int]] = []
@@ -745,7 +782,7 @@ class MUSTApp(App[None]):
                     for opt in self.options
                     if any(pattern.search(field) for field in self._option_search_fields(opt))
                 ]
-            option_list.set_options(matched_options)
+            option_list.set_options(self.visible_options(matched_options))
 
     def watch_marker(self) -> None:
         """React to the marker type being changed."""

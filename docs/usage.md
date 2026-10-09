@@ -38,8 +38,8 @@ The search box at the top filters or navigates the parameter list as you type.
 - **Filter mode** (default): The list is narrowed down to parameters whose name or description
   match the search text.  By default the search text is treated as a regular expression.
   Uncheck the **Regex** checkbox to switch to fuzzy matching instead.
-- **Jump mode**: The full parameter list is kept intact and the best fuzzy match is highlighted.
-  Toggle jump mode with `Ctrl+J`.
+- **Jump mode**: The best fuzzy match is highlighted in the alphabetically sorted list, with up to
+  500 neighbouring parameters shown around it. Toggle jump mode with `Ctrl+J`.
 
 The **Regex** checkbox (top-right of the search bar) switches between regex and fuzzy matching
 while in filter mode.
@@ -52,6 +52,9 @@ provider.  Each entry is shown as:
 ```
 MIBNAME [Description]
 ```
+
+To keep the interface responsive, the list shows at most 500 parameters at a time. When more
+parameters match, the last entry says how many were left out; refine the search to see them.
 
 Scroll through the list with the arrow keys or the mouse.  Press **Enter** (or click) to select
 a parameter — this loads its MIB info, server metadata, and time-series data into the other panels.
@@ -163,8 +166,9 @@ If authentication fails the app offers the choice to **Abort** or continue in **
 
 ### Main Screen
 
-After loading, the main screen is shown with the full parameter list.  A background refresh of
-the parameter catalog runs automatically on first launch.
+After loading, the main screen is shown with the parameter list.  The parameter catalog is
+loaded from the local SQLite cache when available. A background refresh from the server runs at
+startup only when the cache is missing or older than one day; press `r` to refresh it at any time.
 
 ---
 

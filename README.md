@@ -25,7 +25,7 @@ By default, plotting stays in the TUI. You can toggle to a separate interactive 
 ## Development
 
 ```bash
-git clone https://github.com/KU-Leuven/must-tui
+git clone https://github.com/IvS-KULeuven/must-tui
 cd must-tui
 uv venv
 source .venv/bin/activate

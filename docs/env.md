@@ -20,7 +20,22 @@ must-tui uses the following environment variables:
 Credential lookup behavior:
 
 1. Read from environment variables.
-2. If missing, fall back to user config file at `~/.config/must-tui/config.json`.
+2. If missing, fall back to the config file: the path given with `--config`, or `~/.config/must-tui/config.json` by default.
+
+Each value is resolved on its own, so you can, for example, set the password as an environment variable and keep the base URL and username in the config file.
+
+The config file uses its own lowercase keys, not the environment variable names:
+
+| Environment variable | Config file key |
+|----------------------|-----------------|
+| `MUST_LINK_BASE_URL` | `base_url`      |
+| `MUST_LINK_USERNAME` | `username`      |
+| `MUST_LINK_PASSWORD` | `password`      |
+
+The config file also accepts two optional keys that have no environment variable:
+
+- `connect_timeout`: connection timeout in seconds when logging in (default `30`).
+- `token`: a MUST link token that is used when the login request fails.
 
 Cache database location:
 
@@ -65,11 +80,13 @@ If environment variables are not provided, create `~/.config/must-tui/config.jso
 
 ```json
 {
-  "MUST_LINK_BASE_URL": "https://must.example.org",
-  "MUST_LINK_USERNAME": "flight-user",
-  "MUST_LINK_PASSWORD": "change-me"
+  "base_url": "https://must.example.org",
+  "username": "flight-user",
+  "password": "change-me"
 }
 ```
+
+Use the lowercase keys shown above. Keys named after the environment variables (such as `"MUST_LINK_BASE_URL"`) are ignored in the config file.
 
 ## Example: custom cache location
 

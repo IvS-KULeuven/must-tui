@@ -29,10 +29,10 @@ uv run mkdocs serve
 Publish to GitHub Pages using the local MkDocs deploy command:
 
 ```bash
-uv run mkdocs gh-deploy -r upstream -m "Update docs..."
+uv run mkdocs gh-deploy --remote-name upstream --remote-branch gh-pages --force
 ```
 
-This pushes the generated site to the `gh-pages` branch.
+This pushes the generated site to the `gh-pages` branch of the `upstream` remote (`IvS-KULeuven/must-tui`), not your fork. See `RELEASE.md` in the repository root for the full release steps.
 
 ## Package docs dependencies only
 

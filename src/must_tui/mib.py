@@ -66,7 +66,7 @@ async def read_pcf(path: Path | Traversable) -> dict[str, dict]:
             "pid": pcf_pid,  # On-board ID of the telemetry parameter
             "unit": pcf_unit,  # Engineering unit mnemonic
             "ptc": pcf_ptc,  # Parameter Type Code
-            "pcf": pcf_pfc,  # Parameter Format Code
+            "pfc": pcf_pfc,  # Parameter Format Code
             "width": pcf_width,  # Padded Width in bits
             "valid": pcf_valid,
             "related": pcf_related,

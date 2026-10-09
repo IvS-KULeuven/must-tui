@@ -54,6 +54,9 @@ PARAMETER_METADATA_FIELDS = """
 
 VERBOSE_DEBUG = bool_env("VERBOSE_DEBUG", False)
 
+MAX_PLOT_POINTS = 1000
+"""Maximum number of points per series drawn in the terminal plot. Rendering cost grows with the number of points."""
+
 MAX_VISIBLE_OPTIONS = 500
 """Maximum number of parameters shown in the option list. Refilling the list with all ~70k parameters takes seconds."""
 
@@ -73,6 +76,35 @@ class ParameterSelected(Message):
 class TimeRange:
     start: PlainDateTime
     end: PlainDateTime
+
+
+def downsample_min_max(
+    timestamps: list[datetime.datetime], values: list[float], max_points: int = MAX_PLOT_POINTS
+) -> tuple[list[datetime.datetime], list[float]]:
+    """Reduce a series to at most `max_points` points, keeping the minimum and maximum of each bucket.
+
+    Unlike taking every n-th sample, this keeps spikes and dips visible in the plot.
+    """
+
+    count = len(values)
+    if count <= max_points:
+        return timestamps, values
+
+    buckets = max_points // 2
+    out_time: list[datetime.datetime] = []
+    out_values: list[float] = []
+    for bucket in range(buckets):
+        lo = bucket * count // buckets
+        hi = (bucket + 1) * count // buckets
+        if lo >= hi:
+            continue
+        i_min = min(range(lo, hi), key=values.__getitem__)
+        i_max = max(range(lo, hi), key=values.__getitem__)
+        for idx in sorted({i_min, i_max}):
+            out_time.append(timestamps[idx])
+            out_values.append(values[idx])
+
+    return out_time, out_values
 
 
 class ParameterMetadata(Static):
@@ -203,6 +235,8 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         self.data: list[list[float]] = []
         self.time: list[list[datetime.datetime]] = []
         self.labels: list[str] = []
+        self.display_series: list[tuple[list[str], list[float]]] = []
+        """Downsampled copies of the series, with formatted timestamps, as drawn by plotext."""
         self.xlimits: tuple[datetime.datetime, datetime.datetime] | None = None
         self.ylimits: tuple[float, float] | None = None
 
@@ -218,6 +252,7 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         self.data = []
         self.time = []
         self.labels = []
+        self.display_series = []
         self.plt.clear_data()
         self.replot()
 
@@ -244,6 +279,9 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         self.data.append(values)
         self.labels.append(par_name)
 
+        display_time, display_values = downsample_min_max(timestamps, values)
+        self.display_series.append(([x.strftime("%Y-%m-%d %H:%M:%S") for x in display_time], display_values))
+
         log.info(f"Updating plot for {par_name} with {len(values)} data points, {max(values)=}.")
 
         self.replot()
@@ -257,8 +295,8 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         plotter.title(self.title)
         # self.plt.xlabel("Date-Time")  # takes too much real estate
         # self.plt.ylabel("Value")  # will be put in the same space as the x-label
-        for time, data in zip(self.time, self.data):
-            plotter.plot([x.strftime("%Y-%m-%d %H:%M:%S") for x in time], data, marker=self.marker)
+        for time, data in self.display_series:
+            plotter.plot(time, data, marker=self.marker)
         self.refresh()
 
     async def _watch_marker(self) -> None:
@@ -571,9 +609,15 @@ class MUSTApp(App[None]):
 
     @on(DateTimeRangePicker.Changed, "#datetime-range-picker")
     async def on_datetime_range_changed(self, event: DateTimeRangePicker.Changed) -> None:
-        assert event.start is not None and event.end is not None
         log.info(f"DateTimeRangePicker changed: {event.start=} {event.end=}")
+        if event.start is None or event.end is None:
+            # The picker was (partially) cleared; keep the previous range.
+            return
         self.time_range = TimeRange(start=event.start, end=event.end)
+        if not self._time_range_is_valid():
+            # Leave the plot limits alone: plotext fails on a zero-width range. Fetching is refused in _plot_parameter.
+            log.warning(f"Invalid time range: start {event.start} is not before end {event.end}.")
+            return
         self.call_later(self.plot_widget.set_xlimits, event.start.py_datetime(), event.end.py_datetime())
         if self.plot_backend == "matplotlib":
             self.call_later(self.matplotlib_plotter.set_xlimits, event.start.py_datetime(), event.end.py_datetime())
@@ -597,9 +641,35 @@ class MUSTApp(App[None]):
         event.stop()
 
     @on(ParameterSelected)
-    async def on_par_selected(self, message: ParameterSelected) -> None:
+    def on_par_selected(self, message: ParameterSelected) -> None:
+        self.plot_parameter(message.parameter_name)
+
+    @work(exclusive=True, group="plot", exit_on_error=False)
+    async def plot_parameter(self, par_name: str) -> None:
+        """Fetch and plot data for a parameter in the background, so the UI stays responsive.
+
+        Being exclusive, a new selection cancels a fetch that is still running.
+        """
+
+        try:
+            await self._plot_parameter(par_name)
+        except Exception as exc:
+            log.error(f"Plotting parameter {par_name} failed: {exc!r}")
+            self.show_warning_dialog(f"Plotting parameter {par_name} failed: {exc}")
+
+    def _time_range_is_valid(self) -> bool:
+        return self.time_range.start < self.time_range.end
+
+    async def _plot_parameter(self, par_name: str) -> None:
+        if not self._time_range_is_valid():
+            self.show_warning_dialog(
+                f"The start time ({self.time_range.start}) must be before the end time ({self.time_range.end}). "
+                "Adjust the time range and select the parameter again."
+            )
+            return
+
         data_provider = self.DATA_PROVIDER
-        par_name = message.parameter_name
+        received_response = False
 
         async for data in get_parameter_data(
             self.must_ctx,
@@ -609,6 +679,7 @@ class MUSTApp(App[None]):
             self.time_range.end.format_common_iso().replace("T", " "),
             paginated=False,
         ):
+            received_response = True
             timestamps, values = get_raw_data_with_timestamp(data)
             log.info(
                 f"Updating data for parameter {par_name} from {self.time_range.start} to {self.time_range.end}, data length: {len(timestamps)}"
@@ -616,9 +687,7 @@ class MUSTApp(App[None]):
 
             if not timestamps or not values:
                 log.warning(f"No data available for parameter {par_name} in the specified time range.")
-                self.call_later(
-                    self.show_warning_dialog, f"No data available for parameter {par_name} in the specified time range."
-                )
+                self.show_warning_dialog(f"No data available for parameter {par_name} in the specified time range.")
                 continue
 
             self.plot_widget.set_xlimits(self.time_range.start.py_datetime(), self.time_range.end.py_datetime())
@@ -626,13 +695,18 @@ class MUSTApp(App[None]):
             await self.plot_widget.update(par_name, timestamps, values, self.time_range)
 
             if self.plot_backend == "matplotlib":
-                self.matplotlib_plotter.set_xlimits(
-                    self.time_range.start.py_datetime(), self.time_range.end.py_datetime()
-                )
-                self.matplotlib_plotter.set_ylimits(min(values) - 1.0, max(values) + 1.0)
-                await self.matplotlib_plotter.update(par_name, timestamps, values, self.time_range)
+                with self.matplotlib_plotter.batch():
+                    self.matplotlib_plotter.set_xlimits(
+                        self.time_range.start.py_datetime(), self.time_range.end.py_datetime()
+                    )
+                    self.matplotlib_plotter.set_ylimits(min(values) - 1.0, max(values) + 1.0)
+                    await self.matplotlib_plotter.update(par_name, timestamps, values, self.time_range)
 
-        # self.plot_widget.replot()
+        if not received_response:
+            self.show_warning_dialog(
+                f"No response from the MUST server for parameter {par_name}. The request failed or timed out; "
+                "see the log for details."
+            )
 
     def action_toggle_jump(self) -> None:
         controls = self._get_main_controls()
@@ -699,13 +773,25 @@ class MUSTApp(App[None]):
         mib_name = self.pars_mapping.get(par_name)
         log.debug(f"{par_name=}, {mib_name=}")
         if mib_name:
+            self.load_parameter_metadata(mib_name)
+
+    @work(exclusive=True, group="metadata", exit_on_error=False)
+    async def load_parameter_metadata(self, mib_name: str) -> None:
+        """Fetch parameter metadata in the background, then request the plot.
+
+        Being exclusive, a new selection cancels a fetch that is still running.
+        """
+
+        try:
             metadata = await get_parameter_metadata(self.must_ctx, mib_name)
             try:
                 parameter_metadata = self.screen.query_one(ParameterMetadata)
             except NoMatches:
                 return
             await parameter_metadata.update_metadata(mib_name, metadata[0] if metadata else {})
-            self.post_message(ParameterSelected(mib_name))
+        except Exception as exc:
+            log.error(f"Loading metadata for parameter {mib_name} failed: {exc!r}")
+        self.post_message(ParameterSelected(mib_name))
 
     def jump_to_item(self) -> None:
         controls = self._get_main_controls()

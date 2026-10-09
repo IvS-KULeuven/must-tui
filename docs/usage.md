@@ -58,6 +58,10 @@ parameters match, the last entry says how many were left out; refine the search 
 
 Scroll through the list with the arrow keys or the mouse.  Press **Enter** (or click) to select
 a parameter — this loads its MIB info, server metadata, and time-series data into the other panels.
+Server data is loaded in the background, so the interface stays responsive. If you select another
+parameter before the previous one has finished loading, the previous request is cancelled and only
+the latest selection is loaded. A request is abandoned, and reported in a dialog, when the MUST
+server sends no data for 30 seconds; slow transfers that keep receiving data are not interrupted.
 
 ### Parameter Info
 
@@ -119,13 +123,19 @@ A toolbar between the info panels and the plot area:
 | **Plot: TUI / Plot: Matplotlib** button | Toggle between the built-in TUI plot and an external Matplotlib window |
 | **DateTime range picker** | Set the start and end time for data retrieval and the plot x-axis |
 
-Changing the date-time range immediately updates the x-axis limits.  Selecting a new parameter
+Changing the date-time range immediately updates the x-axis limits. The start time must be before
+the end time: as long as it is not (for example after setting only the start to the current time),
+the x-axis is left unchanged and selecting a parameter shows a warning instead of loading data.  Selecting a new parameter
 fetches and plots its data for the current time range.
 
 ### Plot
 
 The lower-right area renders a time-series plot of the selected parameter(s).  Multiple
 parameters can be overlaid — each new selection adds a trace without clearing previous ones.
+
+To keep the terminal plot fast, each trace is drawn with at most 1000 points. Long series are
+reduced by keeping the minimum and maximum of each time bucket, so spikes and dips remain
+visible. The Matplotlib backend always shows the full-resolution data.
 
 Use the **Clear Plot** button (or press `c`) to reset the plot.
 

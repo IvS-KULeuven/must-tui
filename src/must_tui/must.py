@@ -20,6 +20,13 @@ from must_tui.parameter_cache import load_parameter_cache_rows, reset_parameter_
 # from egse.system import title_to_kebab
 VERBOSE_DEBUG = bool_env("VERBOSE_DEBUG", default=False)
 
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=30)
+"""Timeout for MUST link API requests: give up when connecting, or waiting for the next data, takes longer than 30 s.
+
+There is no limit on the total duration, so large but healthy transfers still complete. aiohttp's default
+(5 minutes total) made the TUI look hung when the server stalled.
+"""
+
 _PARAMETER_CATALOG_CACHE: dict[str, dict[str, dict[str, str]]] = {}
 _PCF_CACHE: dict[str, dict] | None = None
 _T = TypeVar("_T")
@@ -109,6 +116,9 @@ async def login(config_file: Path | None = None):
     except (ConnectionError, aiohttp.ClientError) as exc:
         logger.error(f"ConnectionError: {exc}")
         return context
+    except TimeoutError:
+        logger.error(f"Login to MUST link timed out (connect timeout {connect_timeout} s, total 60 s).")
+        return context
 
     return context
 
@@ -136,7 +146,7 @@ async def must_request(ctx: MustContext, path: str, mode: str = "GET", payload: 
     logger.debug(f"{header=}")
 
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=REQUEST_TIMEOUT) as session:
             if mode == "GET":
                 async with session.get(url, headers=header) as response:
                     if response.status == 401:
@@ -162,6 +172,9 @@ async def must_request(ctx: MustContext, path: str, mode: str = "GET", payload: 
                 return
     except aiohttp.ClientError as exc:
         logger.error(f"Request failed: {exc}")
+        return
+    except TimeoutError:
+        logger.error(f"Request timed out (no data from the server for {REQUEST_TIMEOUT.sock_read} s): {url}")
         return
 
 

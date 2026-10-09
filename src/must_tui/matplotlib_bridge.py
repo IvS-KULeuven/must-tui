@@ -1,9 +1,11 @@
+import contextlib
 import datetime
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
+from collections.abc import Iterator
 from typing import Any
 
 
@@ -36,6 +38,21 @@ class MatplotlibPlotter:
         self.marker: str = "dot"
         self._process: subprocess.Popen[str] | None = None
         self._stdin: Any = None
+        self._batching: bool = False
+
+    @contextlib.contextmanager
+    def batch(self) -> Iterator[None]:
+        """Send the plot state once at the end of the block instead of after every change.
+
+        The full state (all series) is sent on every change, which can be tens of MB.
+        """
+
+        self._batching = True
+        try:
+            yield
+        finally:
+            self._batching = False
+            self._send_state()
 
     def set_context(self, _must_ctx: Any) -> None:
         # Keeps the same app-facing API as the textual plotter.
@@ -111,7 +128,7 @@ class MatplotlibPlotter:
             self._stdin = None
 
     def _send_state(self) -> None:
-        if self._stdin is None:
+        if self._stdin is None or self._batching:
             return
 
         payload = {

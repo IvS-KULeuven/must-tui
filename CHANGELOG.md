@@ -13,9 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Jump mode (`Ctrl+J`) shows a window of up to 500 parameters around the best match instead of the full list.
 - At startup, the parameter catalog is only re-downloaded from the server when the local cache is missing or older than one day (previously on every launch). Press `r` to refresh it manually.
 - Loading the parameter catalog from the SQLite cache and storing a refreshed catalog in it now run in a worker thread instead of on the UI event loop.
+- The terminal plot draws at most 1000 points per trace, keeping the minimum and maximum of each time bucket so spikes remain visible. Redrawing previously cost about 100 ms per plotted trace (3 days of data), which made the app slower with every selected parameter. The Matplotlib backend still receives the full data.
+- Selecting a parameter fetches its metadata and data in background workers, so keyboard input no longer waits for the MUST server. A new selection cancels a fetch that is still running.
+- With the Matplotlib backend, each selection sends the plot state to the Matplotlib process once instead of four times.
 
 ### Fixed
 
+- MUST link requests now time out when connecting or waiting for data takes longer than 30 seconds (previously aiohttp's default of 5 minutes in total, during which the TUI appeared to hang). There is no limit on the total duration, so large transfers still complete. This applies to the REPL helpers too. In the TUI, a request that gets no response is reported in a warning dialog instead of failing silently.
+- A time range whose start is not before its end (e.g. after setting only the start time to now) no longer reaches plotext or the MUST server: the x-axis is left unchanged and selecting a parameter shows a warning. A zero-width range made plotext raise `ZeroDivisionError`.
+- Clearing the date-time range picker no longer crashes the app on an `assert`.
+- A login or request timeout is now handled and logged instead of raising an uncaught `TimeoutError`.
 - The Parameter Format Code from the PCF is now stored under the key `pfc` (was `pcf`), so the TUI's ParameterInfo panel shows its value instead of `N/A`. In `search_parameters()` results the field is now `pcf_pfc` (was `pcf_pcf`).
 
 ## [0.3.7] - 2026-06-30

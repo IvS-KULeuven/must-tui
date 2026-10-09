@@ -28,8 +28,11 @@ with precedence over the config file.
 Configuration precedence:
 
 1. Environment variables
-2. Config file specified with `--config <path>`
-3. Config file at `~/.config/must-tui/config.json` (default)
+2. The config file
+
+Only one config file is read: the one given with `--config <path>`, or
+`~/.config/must-tui/config.json` when `--config` is not used. The default file
+is not consulted as a further fallback when `--config` is given.
 
 Supported environment variables:
 

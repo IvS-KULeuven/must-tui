@@ -2574,15 +2574,15 @@ wheels = [
 
 [[package]]
 name = "navdict"
-version = "0.6.3"
+version = "0.11.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "rich" },
     { name = "ruamel-yaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/13/79/e10a79a2aac4c5be58f5a3459993cac9af2f6f7501be79ea391a36b2698a/navdict-0.6.3.tar.gz", hash = "sha256:9830032041c11c48128c9c48b2ecfd31618f04cad5c7b9007d48e628c218d986", size = 309359, upload-time = "2025-10-17T07:38:47.098Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/55/a6/081cc45829830584a57c8f5764152b945ff7d9b099acd5d30e4059454f53/navdict-0.11.2.tar.gz", hash = "sha256:50ec5aba4b1a8cc894089486e53a1b47f3dc27980c231da5c5f9771460b1216a", size = 384446, upload-time = "2026-07-17T14:07:42.395Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b3/c5/45356a42421af84c2040f07fd7137818803c62c2329464a0a1be9e8e2b97/navdict-0.6.3-py3-none-any.whl", hash = "sha256:50740943be0fb71a21fba2725144030f83c1a60c595349a372134a183e250042", size = 17388, upload-time = "2025-10-17T07:38:45.575Z" },
+    { url = "https://files.pythonhosted.org/packages/29/44/fac777030bcbdebdbb4d9a54053485d606b838d715ea9bc6823f405395a7/navdict-0.11.2-py3-none-any.whl", hash = "sha256:882d20ec861f9152efc503412a74da9458875f2476722da324891c92ce129317", size = 16453, upload-time = "2026-07-17T14:07:43.704Z" },
 ]
 
 [[package]]

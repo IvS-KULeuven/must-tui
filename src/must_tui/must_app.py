@@ -21,7 +21,8 @@ from textual.events import MouseScrollDown, MouseScrollUp, MouseDown, MouseUp, M
 from textual.widgets import Button, Checkbox, DataTable, Footer, Header, Input, OptionList, Static
 from textual.widgets.option_list import Option
 from textual_plotext import PlotextPlot as PlotWidget
-from thefuzz import fuzz
+# rapidfuzz is not a direct dependency: it is the scoring engine that `thefuzz` (a dependency) is built on.
+from rapidfuzz import fuzz as rf_fuzz, process
 
 from must_tui.dialogs import ErrorDialog, WarningDialog
 from must_tui.matplotlib_bridge import MatplotlibPlotter, can_open_matplotlib_window
@@ -62,6 +63,64 @@ MAX_VISIBLE_OPTIONS = 500
 
 PARAMETER_CACHE_MAX_AGE = datetime.timedelta(days=1)
 """The parameter catalog is re-downloaded at startup only when the cache is older than this. Press 'r' to force it."""
+
+SEARCH_DEBOUNCE = 0.15
+"""Seconds to wait after the last keystroke before searching, so typing a word searches once instead of per key."""
+
+MAX_FUZZY_MATCHES = 100
+FUZZY_MIN_SCORE = 50
+
+SEARCH_CHUNK_SIZE = 4096
+"""Number of options scored per rapidfuzz call; each call blocks the UI thread until it returns (a few ms)."""
+
+SearchFields = tuple[str, str, str]
+"""The option label, MIB name and PCF description_2 of one parameter, the fields that are searched."""
+
+
+def match_options(search: str, fields: list[SearchFields], mode: str) -> list[int]:
+    """Return the indices into `fields` that match `search`.
+
+    Modes:
+
+    - "regex": all options where the case-insensitive regex matches one of the fields, in list order.
+      Raises re.error for an invalid pattern.
+    - "fuzzy": at most MAX_FUZZY_MATCHES options scoring above FUZZY_MIN_SCORE, best first.
+    - "jump": the single best-scoring option (the first one when scores tie), or nothing for an empty list.
+
+    The fuzzy score of an option is the highest `partial_ratio` over its fields, rounded like `thefuzz` does.
+    This is a pure function, so it can run on a worker thread.
+    """
+
+    if mode == "regex":
+        pattern = re.compile(search, re.IGNORECASE).search
+        return [idx for idx, (label, name, desc) in enumerate(fields) if pattern(label) or pattern(name) or pattern(desc)]
+
+    # rapidfuzz scores many strings in one C call; `thefuzz.fuzz.partial_ratio` is the same scorer, one pair at a time.
+    # A C call holds the GIL until it returns, so the options are scored in chunks to let the UI thread run in between.
+    # Options that score too low to be selected are skipped: below FUZZY_MIN_SCORE in fuzzy mode, and below the best
+    # score so far in jump mode, where the first option with the best score wins.
+    best: dict[int, int] = {}
+    jump_idx, jump_score = None, -1
+    for offset in range(0, len(fields), SEARCH_CHUNK_SIZE):
+        cutoff = FUZZY_MIN_SCORE if mode == "fuzzy" else max(jump_score - 0.5, 0)
+        chunk_best: dict[int, int] = {}
+        for column in zip(*fields[offset : offset + SEARCH_CHUNK_SIZE]):
+            for _, score, idx in process.extract(
+                search, column, scorer=rf_fuzz.partial_ratio, processor=None, limit=None, score_cutoff=cutoff
+            ):
+                chunk_best[offset + idx] = max(chunk_best.get(offset + idx, 0), int(round(score)))
+        if mode == "jump":
+            for idx in sorted(chunk_best):
+                if chunk_best[idx] > jump_score:
+                    jump_idx, jump_score = idx, chunk_best[idx]
+        else:
+            best.update(chunk_best)
+
+    if mode == "jump":
+        return [] if jump_idx is None else [jump_idx]
+
+    scored = sorted((idx for idx, score in best.items() if score > FUZZY_MIN_SCORE), key=lambda idx: (-best[idx], idx))
+    return scored[:MAX_FUZZY_MATCHES]
 
 
 class ParameterSelected(Message):
@@ -402,6 +461,7 @@ class MUSTApp(App[None]):
         self.pars_catalog: dict = {}
         self.pars_mapping: dict = {}
         self.options: list[str] = sorted(self.pars_mapping.keys())
+        self.search_fields: list[SearchFields] = []
         self.jump = False
         self._jump_window_start: int | None = None
         self.fuzz = False
@@ -518,16 +578,15 @@ class MUSTApp(App[None]):
             self.pars_mapping[label] = mib_name
 
         self.options = sorted(self.pars_mapping.keys())
+        self.search_fields = [self._option_search_fields(opt) for opt in self.options]
+        self._jump_window_start = None
         controls = self._get_main_controls()
         if controls is not None:
             search_input, option_list = controls
-            search = search_input.value
-            if search == "":
+            if search_input.value == "":
                 option_list.set_options(self.visible_options(self.options))
-            elif self.jump:
-                self.jump_to_item()
             else:
-                self.filter_items()
+                self.update_search()
 
     @staticmethod
     def visible_options(matches: list[str]) -> list[str | Option]:
@@ -716,6 +775,7 @@ class MUSTApp(App[None]):
         self.jump = not self.jump
         mode = "Jump" if self.jump else "Filter"
         controls[0].placeholder = f"Search Mode: {mode}"
+        self.update_search()
 
     def action_refresh_parameter_cache(self) -> None:
         asyncio.create_task(self.refresh_parameter_catalog(force_refresh=True))
@@ -731,17 +791,15 @@ class MUSTApp(App[None]):
 
         log.debug(f"Regex checkbox changed: {event.value=}")
         self.fuzz = not event.value
-        self.filter_items()
+        self.update_search()
 
-    @on(Input.Changed)
+    @on(Input.Changed, "#input-search")
     def filter(self, event: Input.Changed) -> None:
+        # Only the search box: the date picker fields are Input subclasses too.
         if not self._main_screen_active():
             return
 
-        if self.jump:
-            self.jump_to_item()
-        else:
-            self.filter_items()
+        self.update_search()
 
     @on(OptionList.OptionSelected)
     async def show_parameter_info(self, event: OptionList.OptionSelected) -> None:
@@ -793,82 +851,76 @@ class MUSTApp(App[None]):
             log.error(f"Loading metadata for parameter {mib_name} failed: {exc!r}")
         self.post_message(ParameterSelected(mib_name))
 
-    def jump_to_item(self) -> None:
+    def _search_mode(self) -> str:
+        return "jump" if self.jump else "fuzzy" if self.fuzz else "regex"
+
+    def update_search(self) -> None:
+        """Update the option list for the text in the search box.
+
+        An empty search shows the start of the list right away; otherwise the search runs in the `search_options`
+        worker after a short pause in typing.
+        """
+
         controls = self._get_main_controls()
         if controls is None:
             return
 
         search_input, option_list = controls
-        search = search_input.value
-        if search == "":
+        self.workers.cancel_group(self, "search")
+        if search_input.value == "":
+            if not self.jump:
+                option_list.set_options(self.visible_options(self.options))
             return
 
-        scores: list[tuple[str, int]] = []
-        for opt in self.options:
-            label, mib_name, description_2 = self._option_search_fields(opt)
-            score = max(
-                fuzz.partial_ratio(search, label),
-                fuzz.partial_ratio(search, mib_name),
-                fuzz.partial_ratio(search, description_2),
-            )
-            scores.append((opt, score))
+        self.search_options(search_input.value, self._search_mode())
 
-        if not scores:
+    @work(exclusive=True, group="search", exit_on_error=False)
+    async def search_options(self, search: str, mode: str) -> None:
+        """Search the ~70k options on a thread, so typing stays responsive.
+
+        Being exclusive, every keystroke cancels the previous search while it is still waiting out the debounce.
+        A search that is already running on the thread can't be stopped, so its result is dropped when the search
+        text, the mode or the catalog changed in the meantime.
+        """
+
+        await asyncio.sleep(SEARCH_DEBOUNCE)
+        await self._search_options(search, mode)
+
+    async def _search_options(self, search: str, mode: str) -> None:
+        options = self.options
+        try:
+            indices = await asyncio.to_thread(match_options, search, self.search_fields, mode)
+        except re.error as exc:
+            log.error(f"Invalid regex pattern: {exc}")
             return
 
-        best_match, _ = max(scores, key=lambda item: item[1])
-        idx = self.options.index(best_match)
+        controls = self._get_main_controls()
+        if controls is None:
+            return
+        search_input, option_list = controls
+        if search_input.value != search or self._search_mode() != mode or self.options is not options:
+            return
 
-        # Show a window of the sorted list around the best match instead of the whole list.
-        # Only refill the list when the best match is not already in the window that is shown.
+        if mode == "jump":
+            if indices:
+                self._jump_to_index(option_list, indices[0])
+        else:
+            option_list.set_options(self.visible_options([options[idx] for idx in indices]))
+
+    def _jump_to_index(self, option_list: OptionList, idx: int) -> None:
+        """Highlight option `idx`, showing a window of the sorted list around it instead of the whole list."""
+
+        # Only refill the list when the option is not already in the window that is shown.
         start = self._jump_window_start
         if not (
             start is not None
             and 0 <= idx - start < option_list.option_count
-            and option_list.get_option_at_index(idx - start).prompt == best_match
+            and option_list.get_option_at_index(idx - start).prompt == self.options[idx]
         ):
             start = max(0, min(idx - MAX_VISIBLE_OPTIONS // 2, len(self.options) - MAX_VISIBLE_OPTIONS))
             option_list.set_options(self.options[start : start + MAX_VISIBLE_OPTIONS])
             self._jump_window_start = start
         option_list.highlighted = idx - start
-
-    def filter_items(self) -> None:
-        controls = self._get_main_controls()
-        if controls is None:
-            return
-
-        search_input, option_list = controls
-        search = search_input.value
-        option_list.clear_options()
-        if search == "":
-            option_list.set_options(self.visible_options(self.options))
-        else:
-            if self.fuzz:
-                scored_options: list[tuple[str, int]] = []
-                for opt in self.options:
-                    label, mib_name, description_2 = self._option_search_fields(opt)
-                    score = max(
-                        fuzz.partial_ratio(search, label),
-                        fuzz.partial_ratio(search, mib_name),
-                        fuzz.partial_ratio(search, description_2),
-                    )
-                    scored_options.append((opt, score))
-
-                scored_options.sort(key=lambda item: item[1], reverse=True)
-                matched_options = [opt for opt, score in scored_options[:100] if score > 50]
-            else:
-                log.debug(f"Filtering with regex: {search=}")
-                try:
-                    pattern = re.compile(search, re.IGNORECASE)
-                except Exception as exc:
-                    log.error(f"Invalid regex pattern: {exc}")
-                    return
-                matched_options = [
-                    opt
-                    for opt in self.options
-                    if any(pattern.search(field) for field in self._option_search_fields(opt))
-                ]
-            option_list.set_options(self.visible_options(matched_options))
 
     def watch_marker(self) -> None:
         """React to the marker type being changed."""

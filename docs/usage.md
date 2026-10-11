@@ -44,6 +44,10 @@ The search box at the top filters or navigates the parameter list as you type.
 The **Regex** checkbox (top-right of the search bar) switches between regex and fuzzy matching
 while in filter mode.
 
+The search runs once you pause typing for a moment, not on every keystroke. While a regular
+expression is incomplete or invalid (e.g. an unclosed parenthesis), the list keeps showing the
+previous matches.
+
 ### Parameter List
 
 The left panel lists all parameters retrieved from the MUST server for the configured data

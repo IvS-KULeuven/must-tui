@@ -18,12 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With the Matplotlib backend, each selection sends the plot state to the Matplotlib process once instead of four times.
 - Searching the parameter list waits until typing pauses for 0.15 s and then runs on a worker thread, so keystrokes show up immediately instead of waiting for the previous key's search (previously 0.5 s in regex mode and 1.2–1.7 s in fuzzy and jump mode on the ~70,000-parameter catalog). Results are the same as before. Toggling jump mode (`Ctrl+J`) now re-runs the search for the current text.
 - An invalid regular expression in the search box now keeps the current list instead of emptying it.
+- The date-time range picker (`textual-timepiece`) is replaced by two plain start/end fields and a **Lock** checkbox. Type `YYYY-MM-DD`, `YYYY-MM-DD HH:MM`, `YYYY-MM-DD HH:MM:SS` or `now`; a field is applied when you press Enter or leave it. Invalid dates and a start that is not before the end are marked in red, explained in a notification, and leave the range unchanged. **Lock** keeps the duration fixed when one end is changed. This removes the old picker's problems: months 03–09 could not be typed, Backspace on the month edited the year, impossible dates such as 2025-11-31 were silently ignored, and every keystroke that formed a valid date already changed the range.
+- Changing the time range now fetches the plotted parameters again for the new range (previously only the x-axis moved, leaving parts of the range without data). Notifications report the reload and any parameter without data in the new range, which is removed from the plot.
 
 ### Fixed
 
+- The terminal plot keeps showing the selected time range on its x-axis. Every redraw (a new trace, a marker change) used to reset the axis to the span of the data.
 - MUST link requests now time out when connecting or waiting for data takes longer than 30 seconds (previously aiohttp's default of 5 minutes in total, during which the TUI appeared to hang). There is no limit on the total duration, so large transfers still complete. This applies to the REPL helpers too. In the TUI, a request that gets no response is reported in a warning dialog instead of failing silently.
-- A time range whose start is not before its end (e.g. after setting only the start time to now) no longer reaches plotext or the MUST server: the x-axis is left unchanged and selecting a parameter shows a warning. A zero-width range made plotext raise `ZeroDivisionError`.
-- Clearing the date-time range picker no longer crashes the app on an `assert`.
 - A login or request timeout is now handled and logged instead of raising an uncaught `TimeoutError`.
 - The Parameter Format Code from the PCF is now stored under the key `pfc` (was `pcf`), so the TUI's ParameterInfo panel shows its value instead of `N/A`. In `search_parameters()` results the field is now `pcf_pfc` (was `pcf_pcf`).
 

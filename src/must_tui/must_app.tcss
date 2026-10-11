@@ -98,9 +98,6 @@ PlotWidget {
     height: 3;
 }
 
-DateTimeRangePicker {
-}
-
 ErrorDialog {
     align: center middle;
 }

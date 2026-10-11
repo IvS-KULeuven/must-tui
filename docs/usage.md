@@ -125,11 +125,20 @@ A toolbar between the info panels and the plot area:
 |---|---|
 | **Clear Plot** button | Remove all plotted traces |
 | **Plot: TUI / Plot: Matplotlib** button | Toggle between the built-in TUI plot and an external Matplotlib window |
-| **DateTime range picker** | Set the start and end time for data retrieval and the plot x-axis |
+| **Start → End** fields | Set the start and end time for data retrieval and the plot x-axis |
+| **Lock** checkbox | Keep the duration fixed: changing one end moves the other end along |
 
-Changing the date-time range immediately updates the x-axis limits. The start time must be before
-the end time: as long as it is not (for example after setting only the start to the current time),
-the x-axis is left unchanged and selecting a parameter shows a warning instead of loading data.  Selecting a new parameter
+Type a date-time as `YYYY-MM-DD HH:MM:SS`. Shorter forms are accepted too: `YYYY-MM-DD HH:MM`
+(seconds 0) and `YYYY-MM-DD` (midnight), and `now` for the current local time. A field is applied
+when you press **Enter** or leave it (e.g. with **Tab**); typing alone changes nothing.
+
+If the text is not a valid date-time, or the start would not be before the end, the field turns red,
+a notification explains why, and the time range stays as it was. Editing the field removes the red
+mark.
+
+When the time range changes, the x-axis moves to the new range and all plotted parameters are
+fetched again for it. A notification shows when the reload starts and when it is done; parameters
+without data in the new range are listed there and removed from the plot. Selecting a parameter
 fetches and plots its data for the current time range.
 
 ### Plot

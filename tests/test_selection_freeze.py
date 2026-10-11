@@ -125,25 +125,19 @@ def test_must_request_allows_slow_but_steady_transfer(monkeypatch):
 
 
 def _app_with_range(start, end):
-    from types import SimpleNamespace
-
-    from whenever import PlainDateTime
-
     import must_tui.must_app as must_app
 
     app = must_app.MUSTApp()
-    app.time_range = must_app.TimeRange(start=PlainDateTime(*start), end=PlainDateTime(*end))
+    app.time_range = must_app.TimeRange(start=dt.datetime(*start), end=dt.datetime(*end))
     app.warnings = []
     app.show_warning_dialog = app.warnings.append
-    app.later = []
-    app.call_later = lambda *args: app.later.append(args)
-    return app, SimpleNamespace, PlainDateTime
+    return app
 
 
 def test_plot_parameter_refuses_start_after_end(monkeypatch):
     import must_tui.must_app as must_app
 
-    app, _, _ = _app_with_range((2026, 10, 9, 18), (2025, 12, 5))
+    app = _app_with_range((2026, 10, 9, 18), (2025, 12, 5))
     fetched = []
 
     async def fake_get_parameter_data(*args, **kwargs):
@@ -156,23 +150,3 @@ def test_plot_parameter_refuses_start_after_end(monkeypatch):
 
     assert fetched == []
     assert len(app.warnings) == 1 and "must be before the end time" in app.warnings[0]
-
-
-def test_range_change_with_start_after_end_does_not_touch_plot_limits():
-    app, SimpleNamespace, PlainDateTime = _app_with_range((2025, 12, 2), (2025, 12, 5))
-    event = SimpleNamespace(start=PlainDateTime(2026, 10, 9, 18), end=PlainDateTime(2025, 12, 5))
-
-    asyncio.run(app.on_datetime_range_changed(event))
-
-    assert app.time_range.start == event.start
-    assert app.later == []
-
-
-def test_range_change_with_cleared_picker_keeps_previous_range():
-    app, SimpleNamespace, PlainDateTime = _app_with_range((2025, 12, 2), (2025, 12, 5))
-    previous = app.time_range
-
-    asyncio.run(app.on_datetime_range_changed(SimpleNamespace(start=None, end=None)))
-
-    assert app.time_range == previous
-    assert app.later == []

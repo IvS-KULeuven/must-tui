@@ -16,7 +16,6 @@ dependencies = [
     "textual-dev",
     "textual-plot",
     "textual-plotext",
-    "textual-timepiece",
     "thefuzz",
 ]
 authors = [

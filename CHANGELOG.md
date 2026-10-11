@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The terminal plot draws at most 1000 points per trace, keeping the minimum and maximum of each time bucket so spikes remain visible. Redrawing previously cost about 100 ms per plotted trace (3 days of data), which made the app slower with every selected parameter. The Matplotlib backend still receives the full data.
 - Selecting a parameter fetches its metadata and data in background workers, so keyboard input no longer waits for the MUST server. A new selection cancels a fetch that is still running.
 - With the Matplotlib backend, each selection sends the plot state to the Matplotlib process once instead of four times.
+- Searching the parameter list waits until typing pauses for 0.15 s and then runs on a worker thread, so keystrokes show up immediately instead of waiting for the previous key's search (previously 0.5 s in regex mode and 1.2–1.7 s in fuzzy and jump mode on the ~70,000-parameter catalog). Results are the same as before. Toggling jump mode (`Ctrl+J`) now re-runs the search for the current text.
+- An invalid regular expression in the search box now keeps the current list instead of emptying it.
 
 ### Fixed
 

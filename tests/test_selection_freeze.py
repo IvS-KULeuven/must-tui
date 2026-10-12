@@ -4,9 +4,12 @@ import datetime as dt
 import aiohttp
 from aiohttp import web
 
+import pytest
+
 import must_tui.must as must
 from must_tui.matplotlib_bridge import MatplotlibPlotter
-from must_tui.must_app import downsample_min_max
+from must_tui.must_app import downsample_min_max, parameter_data_range
+from must_tui.time_range_input import TimeRange
 
 
 def _series(count):
@@ -34,6 +37,25 @@ def test_downsample_limits_points_and_keeps_spikes_in_time_order():
     assert max(ds_values) == 1e6
     assert min(ds_values) == -1e6
     assert ds_time == sorted(ds_time)
+
+
+def test_parameter_data_range_uses_first_and_last_sample():
+    metadata = {"first-sample": "2024-01-01 00:00:00", "last-sample": "2024-06-01 12:00:00", "name": "PAR_X"}
+
+    assert parameter_data_range(metadata) == TimeRange(dt.datetime(2024, 1, 1), dt.datetime(2024, 6, 1, 12))
+
+
+@pytest.mark.parametrize("metadata", [{}, {"first-sample": "2024-01-01 00:00:00"}, {"last-sample": None}])
+def test_parameter_data_range_rejects_missing_samples(metadata):
+    with pytest.raises(ValueError, match="Select a parameter"):
+        parameter_data_range(metadata)
+
+
+def test_parameter_data_range_rejects_first_not_before_last():
+    metadata = {"first-sample": "2024-06-01 00:00:00", "last-sample": "2024-01-01 00:00:00"}
+
+    with pytest.raises(ValueError, match="is not before its last sample"):
+        parameter_data_range(metadata)
 
 
 class _CountingPipe:
@@ -125,25 +147,19 @@ def test_must_request_allows_slow_but_steady_transfer(monkeypatch):
 
 
 def _app_with_range(start, end):
-    from types import SimpleNamespace
-
-    from whenever import PlainDateTime
-
     import must_tui.must_app as must_app
 
     app = must_app.MUSTApp()
-    app.time_range = must_app.TimeRange(start=PlainDateTime(*start), end=PlainDateTime(*end))
+    app.time_range = must_app.TimeRange(start=dt.datetime(*start), end=dt.datetime(*end))
     app.warnings = []
     app.show_warning_dialog = app.warnings.append
-    app.later = []
-    app.call_later = lambda *args: app.later.append(args)
-    return app, SimpleNamespace, PlainDateTime
+    return app
 
 
 def test_plot_parameter_refuses_start_after_end(monkeypatch):
     import must_tui.must_app as must_app
 
-    app, _, _ = _app_with_range((2026, 10, 9, 18), (2025, 12, 5))
+    app = _app_with_range((2026, 10, 9, 18), (2025, 12, 5))
     fetched = []
 
     async def fake_get_parameter_data(*args, **kwargs):
@@ -156,23 +172,3 @@ def test_plot_parameter_refuses_start_after_end(monkeypatch):
 
     assert fetched == []
     assert len(app.warnings) == 1 and "must be before the end time" in app.warnings[0]
-
-
-def test_range_change_with_start_after_end_does_not_touch_plot_limits():
-    app, SimpleNamespace, PlainDateTime = _app_with_range((2025, 12, 2), (2025, 12, 5))
-    event = SimpleNamespace(start=PlainDateTime(2026, 10, 9, 18), end=PlainDateTime(2025, 12, 5))
-
-    asyncio.run(app.on_datetime_range_changed(event))
-
-    assert app.time_range.start == event.start
-    assert app.later == []
-
-
-def test_range_change_with_cleared_picker_keeps_previous_range():
-    app, SimpleNamespace, PlainDateTime = _app_with_range((2025, 12, 2), (2025, 12, 5))
-    previous = app.time_range
-
-    asyncio.run(app.on_datetime_range_changed(SimpleNamespace(start=None, end=None)))
-
-    assert app.time_range == previous
-    assert app.later == []

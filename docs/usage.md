@@ -125,11 +125,37 @@ A toolbar between the info panels and the plot area:
 |---|---|
 | **Clear Plot** button | Remove all plotted traces |
 | **Plot: TUI / Plot: Matplotlib** button | Toggle between the built-in TUI plot and an external Matplotlib window |
-| **DateTime range picker** | Set the start and end time for data retrieval and the plot x-axis |
+| **Data Range** button | Set the time range to the selected parameter's first and last sample, as reported by MUST |
+| **Start → End** fields | Set the start and end time for data retrieval and the plot x-axis |
+| **Lock** checkbox | Keep the duration fixed: changing one end moves the other end along |
 
-Changing the date-time range immediately updates the x-axis limits. The start time must be before
-the end time: as long as it is not (for example after setting only the start to the current time),
-the x-axis is left unchanged and selecting a parameter shows a warning instead of loading data.  Selecting a new parameter
+Type a date-time as `YYYY-MM-DD HH:MM:SS`. Shorter forms are accepted too: `YYYY-MM-DD HH:MM`
+(seconds 0) and `YYYY-MM-DD` (midnight). A field is applied when you press **Enter** or leave it
+(e.g. with **Tab**); typing alone changes nothing. **Escape** leaves the field, committing a
+pending valid edit first, the same as **Tab**.
+
+Relative forms are also accepted, resolved against the current local time:
+
+- `now`, `today`, `yesterday`, `tomorrow` — `today`/`yesterday`/`tomorrow` snap to local midnight;
+  `now` keeps the current time, to the second.
+- Any of those with a signed offset, e.g. `now-6h`, `tomorrow+1d`, `yesterday-3h`. The offset uses
+  `w`eeks, `d`ays, `h`ours, `m`inutes and `s`econds, and they can be combined: `now-1d2h30m`.
+- A bare offset such as `-2h30m` or `+1w` is relative to `now`. The sign is required (`6h` alone is
+  rejected as ambiguous).
+
+**↑ / ↓** step the date-time component the cursor is on (year, month, day, hour, minute, second) up
+or down by one, directly in the field's text — without applying it, so pending edits are still only
+applied on **Enter**/**Tab**/**Escape**. Stepping a relative expression first resolves it to an
+absolute date-time, then steps it. Stepping the day/month clamps to the last valid day of the
+resulting month (e.g. 31 Jan + 1 month → 28 Feb); stepping past year 1000 or 9999 does nothing.
+
+If the text is not a valid date-time, or the start would not be before the end, the field turns red,
+a notification explains why, and the time range stays as it was. Editing the field removes the red
+mark.
+
+When the time range changes, the x-axis moves to the new range and all plotted parameters are
+fetched again for it. A notification shows when the reload starts and when it is done; parameters
+without data in the new range are listed there and removed from the plot. Selecting a parameter
 fetches and plots its data for the current time range.
 
 ### Plot

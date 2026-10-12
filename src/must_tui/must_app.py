@@ -2,13 +2,10 @@ import asyncio
 import datetime
 import importlib.resources
 import re
-from dataclasses import dataclass
 from itertools import cycle
 from pathlib import Path
 from typing import Any, cast
 
-from textual_timepiece.pickers import DateTimeRangePicker
-from whenever import PlainDateTime
 from egse.env import bool_env
 from textual import log, on, work
 from textual.app import App, ComposeResult
@@ -28,6 +25,7 @@ from must_tui.dialogs import ErrorDialog, WarningDialog
 from must_tui.matplotlib_bridge import MatplotlibPlotter, can_open_matplotlib_window
 from must_tui.mib import read_pcf
 from must_tui.parameter_cache import get_parameter_cache_updated_at
+from must_tui.time_range_input import TimeRange, TimeRangeInput, format_datetime, parse_datetime
 
 # from textual_plot import HiResMode, PlotWidget
 # from egse.system import title_to_kebab
@@ -131,10 +129,23 @@ class ParameterSelected(Message):
         self.parameter_name = parameter_name
 
 
-@dataclass
-class TimeRange:
-    start: PlainDateTime
-    end: PlainDateTime
+def parameter_data_range(metadata: dict) -> TimeRange:
+    """The `TimeRange` spanning a parameter's `first-sample`/`last-sample`, as reported by MUST's metadata.
+
+    Raises:
+        ValueError: with a message that can be shown to the user, when the metadata has no (valid) sample range.
+    """
+
+    first_sample, last_sample = metadata.get("first-sample"), metadata.get("last-sample")
+    if not isinstance(first_sample, str) or not isinstance(last_sample, str):
+        raise ValueError("Select a parameter with data on MUST first.")
+
+    new_range = TimeRange(parse_datetime(first_sample), parse_datetime(last_sample))
+    if not new_range.is_valid():
+        raise ValueError(
+            f"The parameter's first sample ({first_sample}) is not before its last sample ({last_sample})."
+        )
+    return new_range
 
 
 def downsample_min_max(
@@ -281,6 +292,10 @@ class ParameterInfo(Static):
             self.table.add_row(field, str(value), key=field)
 
 
+PLOT_DATE_FORM = "Y-m-d H:M:S"
+"""plotext date format matching `format_datetime()`, for `Plot.date_form()` / `Plot.xlim()`."""
+
+
 class TimeRangePlotter(PlotWidget, can_focus=True):
     """Widget to plot parameter data over a specified time range."""
 
@@ -298,6 +313,9 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         """Downsampled copies of the series, with formatted timestamps, as drawn by plotext."""
         self.xlimits: tuple[datetime.datetime, datetime.datetime] | None = None
         self.ylimits: tuple[float, float] | None = None
+        # plotext defaults to "%d/%m/%Y" until date_form() is called; set it now so the first-ever
+        # set_xlimits() (before any replot() has run) doesn't crash on our "YYYY-MM-DD HH:MM:SS" strings.
+        self.plt.date_form(PLOT_DATE_FORM)
 
     def set_context(self, must_ctx: MustContext) -> None:
         self.must_ctx = must_ctx
@@ -350,7 +368,11 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         # self.plt.clear_data()
         plotter = cast(Any, self.plt)
         plotter.clear_figure()  # not sure yet what the difference is with clf() or cld()
-        plotter.date_form("Y-m-d H:M:S")
+        plotter.date_form(PLOT_DATE_FORM)  # clear_figure() also resets the date form
+        if self.xlimits is not None:
+            # clear_figure() also clears the limits; keep showing the selected time range.
+            start, end = self.xlimits
+            plotter.xlim(start.strftime("%Y-%m-%d %H:%M:%S"), end.strftime("%Y-%m-%d %H:%M:%S"))
         plotter.title(self.title)
         # self.plt.xlabel("Date-Time")  # takes too much real estate
         # self.plt.ylabel("Value")  # will be put in the same space as the x-label
@@ -421,7 +443,12 @@ class MainScreen(Screen[None]):
                 with Horizontal(id="plot-controls"):
                     yield Button("Clear Plot", id="bt-plot-clear")
                     yield Button("Plot: TUI", id="bt-plot-backend")
-                    yield DateTimeRangePicker(app.time_range.start, app.time_range.end, id="datetime-range-picker")
+                    yield Button(
+                        "Data Range",
+                        id="bt-time-range-data",
+                        tooltip="Set the time range to the selected parameter's first and last sample on MUST.",
+                    )
+                    yield TimeRangeInput(app.time_range.start, app.time_range.end, id="time-range")
                 yield app.plot_widget
         yield Footer()
 
@@ -469,7 +496,7 @@ class MUSTApp(App[None]):
         self.plot_widget: TimeRangePlotter = TimeRangePlotter(self.must_ctx)
         self.matplotlib_plotter = MatplotlibPlotter()
         self.plot_backend = "textual"
-        self.time_range = TimeRange(start=PlainDateTime(2025, 12, 2), end=PlainDateTime(2025, 12, 5))
+        self.time_range = TimeRange(start=datetime.datetime(2025, 12, 2), end=datetime.datetime(2025, 12, 5))
 
     async def on_mount(self) -> None:
         self.install_screen(LoadingScreen(), name="loading")
@@ -666,20 +693,120 @@ class MUSTApp(App[None]):
             WarningDialog(title="[b]A warning occurred:[/]", warning_message=warning_message, ok_label="OK")
         )
 
-    @on(DateTimeRangePicker.Changed, "#datetime-range-picker")
-    async def on_datetime_range_changed(self, event: DateTimeRangePicker.Changed) -> None:
-        log.info(f"DateTimeRangePicker changed: {event.start=} {event.end=}")
-        if event.start is None or event.end is None:
-            # The picker was (partially) cleared; keep the previous range.
-            return
-        self.time_range = TimeRange(start=event.start, end=event.end)
-        if not self._time_range_is_valid():
-            # Leave the plot limits alone: plotext fails on a zero-width range. Fetching is refused in _plot_parameter.
-            log.warning(f"Invalid time range: start {event.start} is not before end {event.end}.")
-            return
-        self.call_later(self.plot_widget.set_xlimits, event.start.py_datetime(), event.end.py_datetime())
+    @on(TimeRangeInput.Changed, "#time-range")
+    def on_time_range_changed(self, event: TimeRangeInput.Changed) -> None:
+        """Apply a new time range: move the x-axis and fetch the plotted parameters again for the new range.
+
+        TimeRangeInput only posts valid ranges (start before end), once per change the user confirmed.
+        """
+
+        log.info(f"Time range changed to {event.time_range}")
+        self._apply_time_range(event.time_range)
+
+    def _apply_time_range(self, time_range: TimeRange) -> None:
+        """Move the x-axis to `time_range` and fetch the plotted parameters again for it."""
+
+        self.time_range = time_range
+        start, end = time_range.start, time_range.end
+        self.plot_widget.set_xlimits(start, end)
         if self.plot_backend == "matplotlib":
-            self.call_later(self.matplotlib_plotter.set_xlimits, event.start.py_datetime(), event.end.py_datetime())
+            self.matplotlib_plotter.set_xlimits(start, end)
+        self.reload_plotted_parameters()
+
+    @on(Button.Pressed, "#bt-time-range-data")
+    def use_parameter_data_range(self, event: Button.Pressed) -> None:
+        """Set the time range to the selected parameter's first and last sample, as reported by MUST."""
+
+        event.stop()
+        try:
+            metadata = self.screen.query_one(ParameterMetadata).metadata
+            time_range_input = self.screen.query_one(TimeRangeInput)
+        except NoMatches:
+            return
+
+        try:
+            new_range = parameter_data_range(metadata)
+        except ValueError as exc:
+            self.notify(str(exc), title="Time range not changed", severity="warning")
+            return
+
+        time_range_input.set_time_range(new_range)
+        if new_range != self.time_range:
+            self._apply_time_range(new_range)
+
+    @work(exclusive=True, group="reload", exit_on_error=False)
+    async def reload_plotted_parameters(self) -> None:
+        """Fetch the plotted parameters again for the current time range and replace their series.
+
+        Being exclusive, a further range change cancels a reload that is still running.
+        """
+
+        try:
+            await self._reload_plotted_parameters()
+        except Exception as exc:
+            log.error(f"Reloading the plotted parameters failed: {exc!r}")
+            self.notify(f"Reloading the plotted parameters failed: {exc}", severity="error")
+
+    async def _reload_plotted_parameters(self) -> None:
+        names = list(dict.fromkeys(self.plot_widget.labels))  # unique, in plot order
+        if not names:
+            return
+
+        time_range = self.time_range
+        period = f"{format_datetime(time_range.start)} – {format_datetime(time_range.end)}"
+        self.notify(f"Reloading {len(names)} plotted parameter(s) for {period}…", title="Time range changed")
+
+        reloaded: dict[str, tuple[list[datetime.datetime], list[float]]] = {}
+        without_data: list[str] = []
+        for name in names:
+            timestamps, values = await self._fetch_parameter_data(name, time_range)
+            if timestamps and values:
+                reloaded[name] = (timestamps, values)
+            else:
+                without_data.append(name)
+
+        # Selecting a parameter or clearing the plot may have happened while fetching. Keep what was added
+        # meanwhile (it was fetched for the new range already) and drop what was cleared.
+        current = list(zip(self.plot_widget.labels, self.plot_widget.time, self.plot_widget.data))
+        current_names = {label for label, _, _ in current}
+        series = [(name, *reloaded[name]) for name in names if name in reloaded and name in current_names]
+        series += [(label, t, v) for label, t, v in current if label not in names]
+
+        self.plot_widget.clear_plot()
+        if series:
+            self.plot_widget.set_xlimits(time_range.start, time_range.end)
+            self.plot_widget.set_ylimits(
+                min(min(v) for _, _, v in series) - 1.0, max(max(v) for _, _, v in series) + 1.0
+            )
+            for name, timestamps, values in series:
+                await self.plot_widget.update(name, timestamps, values, time_range)
+        if self.plot_backend == "matplotlib":
+            self.matplotlib_plotter.sync_from_plotter(self.plot_widget)
+
+        message = f"Reloaded {len(reloaded)} of {len(names)} parameter(s) for {period}."
+        if without_data:
+            message += f" No data in this range for: {', '.join(without_data)} (removed from the plot)."
+        self.notify(message, title="Time range changed", severity="warning" if without_data else "information")
+
+    async def _fetch_parameter_data(
+        self, par_name: str, time_range: TimeRange
+    ) -> tuple[list[datetime.datetime], list[float]]:
+        """Fetch the data of one parameter for a time range; empty lists when there is no data or no response."""
+
+        timestamps: list[datetime.datetime] = []
+        values: list[float] = []
+        async for data in get_parameter_data(
+            self.must_ctx,
+            self.DATA_PROVIDER,
+            par_name,
+            format_datetime(time_range.start),
+            format_datetime(time_range.end),
+            paginated=False,
+        ):
+            page_timestamps, page_values = get_raw_data_with_timestamp(data)
+            timestamps += page_timestamps
+            values += page_values
+        return timestamps, values
 
     @on(Button.Pressed, "#bt-plot-clear")
     def clear_plot(self, event) -> None:
@@ -716,11 +843,8 @@ class MUSTApp(App[None]):
             log.error(f"Plotting parameter {par_name} failed: {exc!r}")
             self.show_warning_dialog(f"Plotting parameter {par_name} failed: {exc}")
 
-    def _time_range_is_valid(self) -> bool:
-        return self.time_range.start < self.time_range.end
-
     async def _plot_parameter(self, par_name: str) -> None:
-        if not self._time_range_is_valid():
+        if not self.time_range.is_valid():
             self.show_warning_dialog(
                 f"The start time ({self.time_range.start}) must be before the end time ({self.time_range.end}). "
                 "Adjust the time range and select the parameter again."
@@ -734,8 +858,8 @@ class MUSTApp(App[None]):
             self.must_ctx,
             data_provider,
             par_name,
-            self.time_range.start.format_common_iso().replace("T", " "),
-            self.time_range.end.format_common_iso().replace("T", " "),
+            format_datetime(self.time_range.start),
+            format_datetime(self.time_range.end),
             paginated=False,
         ):
             received_response = True
@@ -749,15 +873,13 @@ class MUSTApp(App[None]):
                 self.show_warning_dialog(f"No data available for parameter {par_name} in the specified time range.")
                 continue
 
-            self.plot_widget.set_xlimits(self.time_range.start.py_datetime(), self.time_range.end.py_datetime())
+            self.plot_widget.set_xlimits(self.time_range.start, self.time_range.end)
             self.plot_widget.set_ylimits(min(values) - 1.0, max(values) + 1.0)
             await self.plot_widget.update(par_name, timestamps, values, self.time_range)
 
             if self.plot_backend == "matplotlib":
                 with self.matplotlib_plotter.batch():
-                    self.matplotlib_plotter.set_xlimits(
-                        self.time_range.start.py_datetime(), self.time_range.end.py_datetime()
-                    )
+                    self.matplotlib_plotter.set_xlimits(self.time_range.start, self.time_range.end)
                     self.matplotlib_plotter.set_ylimits(min(values) - 1.0, max(values) + 1.0)
                     await self.matplotlib_plotter.update(par_name, timestamps, values, self.time_range)
 
@@ -795,7 +917,7 @@ class MUSTApp(App[None]):
 
     @on(Input.Changed, "#input-search")
     def filter(self, event: Input.Changed) -> None:
-        # Only the search box: the date picker fields are Input subclasses too.
+        # Only the search box: the time range fields are Input widgets too.
         if not self._main_screen_active():
             return
 

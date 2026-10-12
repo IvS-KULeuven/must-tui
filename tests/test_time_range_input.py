@@ -403,7 +403,7 @@ class _FakePlotter:
         self.data.append(values)
 
 
-def _app_for_reload(monkeypatch, plotted, server_data, during_fetch=None):
+def _app_for_reload(monkeypatch, plotted, server_data, during_fetch=None, truncated_names=frozenset()):
     app = must_app.MUSTApp()
     app.time_range = TimeRange(dt.datetime(2025, 10, 1), dt.datetime(2025, 10, 2))
     app.plot_widget = _FakePlotter(plotted)
@@ -411,10 +411,12 @@ def _app_for_reload(monkeypatch, plotted, server_data, during_fetch=None):
     app.notify = lambda message, **kwargs: app.notifications.append(message)
     requests = []
 
-    async def fake_get_parameter_data(_ctx, _provider, name, start, end, paginated=False):
+    async def fake_get_parameter_data(_ctx, _provider, name, start, end, paginated=False, truncated=None):
         requests.append((name, start, end))
         if during_fetch:
             during_fetch(app)
+        if name in truncated_names and truncated is not None:
+            truncated.append(True)
         if name in server_data:
             yield {"content": [{"data": [{"date": str(ms), "value": v} for ms, v in server_data[name]]}]}
 
@@ -480,6 +482,18 @@ def test_reload_respects_clear_and_selection_during_the_fetch(monkeypatch):
     # A was cleared by the user while it was being fetched, C was selected meanwhile
     assert app.plot_widget.labels == ["C"]
     assert app.plot_widget.data == [[9.0]]
+
+
+def test_reload_notifies_when_a_parameters_data_is_truncated(monkeypatch):
+    old = [dt.datetime(2025, 12, 2)]
+    server_data = {"A": [(_ms(2025, 10, 1, 12), 5.0)]}
+    app, _ = _app_for_reload(monkeypatch, [("A", old, [1.0])], server_data, truncated_names={"A"})
+
+    asyncio.run(app._reload_plotted_parameters())
+
+    assert app.plot_widget.labels == ["A"]  # the partial data is still plotted, just flagged
+    assert "Only partial data" in app.notifications[-1]
+    assert "A" in app.notifications[-1]
 
 
 class _FakeMainScreen(Screen):

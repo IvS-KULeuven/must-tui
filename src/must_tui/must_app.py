@@ -830,10 +830,13 @@ class MUSTApp(App[None]):
 
         reloaded: dict[str, tuple[list[datetime.datetime], list[float]]] = {}
         without_data: list[str] = []
+        truncated_names: list[str] = []
         for name in names:
-            timestamps, values = await self._fetch_parameter_data(name, time_range)
+            timestamps, values, was_truncated = await self._fetch_parameter_data(name, time_range)
             if timestamps and values:
                 reloaded[name] = (timestamps, values)
+                if was_truncated:
+                    truncated_names.append(name)
             else:
                 without_data.append(name)
 
@@ -858,27 +861,38 @@ class MUSTApp(App[None]):
         message = f"Reloaded {len(reloaded)} of {len(names)} parameter(s) for {period}."
         if without_data:
             message += f" No data in this range for: {', '.join(without_data)} (removed from the plot)."
-        self.notify(message, title="Time range changed", severity="warning" if without_data else "information")
+        if truncated_names:
+            message += f" Only partial data (more samples were available) for: {', '.join(truncated_names)}."
+        self.notify(
+            message,
+            title="Time range changed",
+            severity="warning" if (without_data or truncated_names) else "information",
+        )
 
     async def _fetch_parameter_data(
         self, par_name: str, time_range: TimeRange
-    ) -> tuple[list[datetime.datetime], list[float]]:
-        """Fetch the data of one parameter for a time range; empty lists when there is no data or no response."""
+    ) -> tuple[list[datetime.datetime], list[float], bool]:
+        """Fetch the data of one parameter for a time range; empty lists when there is no data or no response.
+
+        The third element is True when more data was available than the pagination safety limit allowed.
+        """
 
         timestamps: list[datetime.datetime] = []
         values: list[float] = []
+        truncated: list[bool] = []
         async for data in get_parameter_data(
             self.must_ctx,
             self.DATA_PROVIDER,
             par_name,
             format_datetime(time_range.start),
             format_datetime(time_range.end),
-            paginated=False,
+            paginated=True,
+            truncated=truncated,
         ):
             page_timestamps, page_values = get_raw_data_with_timestamp(data)
             timestamps += page_timestamps
             values += page_values
-        return timestamps, values
+        return timestamps, values, bool(truncated)
 
     @on(Button.Pressed, "#bt-plot-clear")
     def clear_plot(self, event) -> None:
@@ -928,45 +942,64 @@ class MUSTApp(App[None]):
 
         data_provider = self.DATA_PROVIDER
         received_response = False
-        total_points = 0
+        timestamps: list[datetime.datetime] = []
+        values: list[float] = []
+        truncated: list[bool] = []
 
+        # paginated=True: avoids one huge request for a parameter with many samples, and matches how MUST link's
+        # REST API is documented -- the plain (non-paginated) endpoint has no limit/cursor of its own. Pages are
+        # accumulated below rather than plotted as they arrive, since plot_widget.update() adds a new trace per
+        # call; it isn't (yet) able to append more points to the trace it just added.
         async for data in get_parameter_data(
             self.must_ctx,
             data_provider,
             par_name,
             format_datetime(self.time_range.start),
             format_datetime(self.time_range.end),
-            paginated=False,
+            paginated=True,
+            truncated=truncated,
         ):
             received_response = True
-            timestamps, values = get_raw_data_with_timestamp(data)
-            log.info(
-                f"Updating data for parameter {par_name} from {self.time_range.start} to {self.time_range.end}, data length: {len(timestamps)}"
-            )
+            page_timestamps, page_values = get_raw_data_with_timestamp(data)
+            timestamps += page_timestamps
+            values += page_values
 
-            if not timestamps or not values:
-                log.warning(f"No data available for parameter {par_name} in the specified time range.")
-                self.show_warning_dialog(f"No data available for parameter {par_name} in the specified time range.")
-                continue
-
-            total_points += len(timestamps)
-            self.plot_widget.set_xlimits(self.time_range.start, self.time_range.end)
-            self.plot_widget.set_ylimits(min(values) - 1.0, max(values) + 1.0)
-            await self.plot_widget.update(par_name, timestamps, values, self.time_range)
-
-            if self.plot_backend == "matplotlib":
-                with self.matplotlib_plotter.batch():
-                    self.matplotlib_plotter.set_xlimits(self.time_range.start, self.time_range.end)
-                    self.matplotlib_plotter.set_ylimits(min(values) - 1.0, max(values) + 1.0)
-                    await self.matplotlib_plotter.update(par_name, timestamps, values, self.time_range)
-
-        self._show_sample_count(par_name, total_points if received_response else None)
+        self._show_sample_count(par_name, len(timestamps) if received_response else None)
 
         if not received_response:
             self.show_warning_dialog(
                 f"No response from the MUST server for parameter {par_name}. The request failed or timed out; "
                 "see the log for details."
             )
+            return
+
+        log.info(
+            f"Fetched data for parameter {par_name} from {self.time_range.start} to {self.time_range.end}, "
+            f"data length: {len(timestamps)}"
+        )
+
+        if not timestamps or not values:
+            log.warning(f"No data available for parameter {par_name} in the specified time range.")
+            self.show_warning_dialog(f"No data available for parameter {par_name} in the specified time range.")
+            return
+
+        if truncated:
+            self.notify(
+                f"Only the first {len(timestamps):,} samples of {par_name} were loaded; more were available "
+                "in this time range.",
+                title="Parameter data truncated",
+                severity="warning",
+            )
+
+        self.plot_widget.set_xlimits(self.time_range.start, self.time_range.end)
+        self.plot_widget.set_ylimits(min(values) - 1.0, max(values) + 1.0)
+        await self.plot_widget.update(par_name, timestamps, values, self.time_range)
+
+        if self.plot_backend == "matplotlib":
+            with self.matplotlib_plotter.batch():
+                self.matplotlib_plotter.set_xlimits(self.time_range.start, self.time_range.end)
+                self.matplotlib_plotter.set_ylimits(min(values) - 1.0, max(values) + 1.0)
+                await self.matplotlib_plotter.update(par_name, timestamps, values, self.time_range)
 
     def _show_sample_count(self, par_name: str, count: int | None) -> None:
         """Show how many samples were fetched for `par_name`, if its metadata panel is still the one displayed."""

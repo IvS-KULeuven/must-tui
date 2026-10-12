@@ -13,8 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A spinner now covers the plot while fetching data for a selection or a time range change, so it's clear the app is working rather than stuck — this can take a while for a parameter with many samples in the selected range.
 - The Parameter Metadata panel shows `plotted-samples`, the number of data points fetched for the current plot.
 
+### Changed
+
+- Fetching parameter data for the TUI (both selecting a parameter and reloading on a time range change) now uses MUST link's paginated endpoint (5000 samples per request) instead of one unpaginated request for the whole range, matching how the REPL helper (`get_parameter_series_async`) already worked. The paginated endpoint is the one MUST link's REST API documents `limit`/`cursor` on; the plain endpoint has no such parameter, so it no longer receives a (previously meaningless) `limit=1000`.
+- The internal safety limit on how many pages a paginated fetch follows is raised from 20 (20,000 samples) to 1000 (5,000,000 samples at the new page size), and reaching it now shows a warning naming the affected parameter(s) and the sample count actually loaded, instead of silently returning incomplete data.
+
 ### Fixed
 
+- Fetching paginated parameter data reuses one connection for every page of a fetch, instead of opening a new one (a fresh TCP+TLS handshake) per page. This had made a multi-page fetch considerably slower than the single unpaginated request it replaced.
+- The Matplotlib plot's title no longer shows raw ANSI color codes (e.g. after switching to that backend, or after a time range change). It was picking up the TUI plot's title as-is, which is colored per parameter to make up for not having a real legend there — the Matplotlib window has a real legend and now gets the plain title.
 - The plot title now lists every currently plotted parameter (`Parameter: X` for one, `Parameters: X, Y, …` for several) instead of only the most recently selected one. This applies to both the TUI and Matplotlib plots. In the TUI plot, each name in the title is colored to match its trace — a real legend there can crash plotext (the terminal plotting library) in some situations, so this is used instead.
 
 ## [0.4.0] - 2026-10-12

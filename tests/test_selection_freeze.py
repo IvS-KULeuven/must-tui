@@ -147,6 +147,20 @@ def test_matplotlib_plotter_title_covers_all_plotted_parameters():
     assert plotter.title == "Parameter Data Plot"
 
 
+def test_sync_from_plotter_uses_the_plain_title_not_the_colored_tui_one():
+    # Regression test: sync_from_plotter() used to copy plotter.title verbatim, leaking the TUI plot's ANSI
+    # color escapes (colored_plot_title()) into the Matplotlib window's title, which has a real legend instead.
+    tui_plotter = TimeRangePlotter(must.MustContext())
+    timestamps, values = _series(3)
+    asyncio.run(tui_plotter.update("PAR_A", timestamps, values, None))
+    assert "\x1b[" in tui_plotter.title  # sanity check: the TUI title really is colored
+
+    mpl_plotter = MatplotlibPlotter()
+    mpl_plotter.sync_from_plotter(tui_plotter)
+
+    assert mpl_plotter.title == "Parameter: PAR_A"
+
+
 def test_parameter_data_range_uses_first_and_last_sample():
     metadata = {"first-sample": "2024-01-01 00:00:00", "last-sample": "2024-06-01 12:00:00", "name": "PAR_X"}
 
@@ -323,6 +337,44 @@ def test_must_request_allows_slow_but_steady_transfer(monkeypatch):
     assert asyncio.run(run()) == list(range(10))
 
 
+def test_get_parameter_data_paginated_reuses_one_connection_for_all_pages():
+    """Regression test: must_request() used to open a new aiohttp.ClientSession (new TCP+TLS handshake) per
+    call, which made pagination much slower than the single request it replaced. get_parameter_data() now
+    passes one session across all pages of a fetch; verified here via the client's ephemeral port staying the
+    same, which only happens when the underlying TCP connection is actually reused.
+    """
+
+    peer_ports = []
+    pages = [
+        {"content": [{"data": [{"date": "1", "value": 1}]}], "cursor": "next"},
+        {"content": [{"data": [{"date": "2", "value": 2}]}], "cursor": ""},
+    ]
+
+    async def handler(request):
+        peer_ports.append(request.transport.get_extra_info("peername")[1])
+        return web.json_response(pages.pop(0))
+
+    async def run():
+        app = web.Application()
+        app.router.add_get("/dataproviders/PLATO/parameters/data/paginated", handler)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "127.0.0.1", 0)
+        await site.start()
+        port = runner.addresses[0][1]
+        try:
+            ctx = must.MustContext(base_url=f"http://127.0.0.1:{port}", token="token", authenticated=True)
+            return [item async for item in must.get_parameter_data(ctx, "PLATO", "PAR", "", "", paginated=True)]
+        finally:
+            await runner.cleanup()
+
+    results = asyncio.run(run())
+
+    assert len(results) == 2
+    assert len(peer_ports) == 2
+    assert peer_ports[0] == peer_ports[1]  # same client-side port: the same TCP connection was reused
+
+
 def _app_with_range(start, end):
     app = must_app.MUSTApp()
     app.time_range = must_app.TimeRange(start=dt.datetime(*start), end=dt.datetime(*end))
@@ -345,6 +397,62 @@ def test_plot_parameter_refuses_start_after_end(monkeypatch):
 
     assert fetched == []
     assert len(app.warnings) == 1 and "must be before the end time" in app.warnings[0]
+
+
+def _ms(*args):
+    return int(dt.datetime(*args).timestamp() * 1000)
+
+
+def test_plot_parameter_fetches_with_pagination(monkeypatch):
+    app = _app_with_range((2025, 12, 2), (2025, 12, 5))
+    calls = []
+
+    async def fake_get_parameter_data(_ctx, _provider, name, start, end, paginated=False, truncated=None):
+        calls.append((name, start, end, paginated))
+        yield {"content": [{"data": [{"date": str(_ms(2025, 12, 2, 1)), "value": 1.0}]}]}
+
+    monkeypatch.setattr(must_app, "get_parameter_data", fake_get_parameter_data)
+
+    asyncio.run(app._plot_parameter("CNKA0966"))
+
+    assert len(calls) == 1
+    assert calls[0][3] is True  # paginated=True, matching the REPL helper and MUST link's documented intent
+
+
+def test_plot_parameter_notifies_when_the_data_is_truncated(monkeypatch):
+    app = _app_with_range((2025, 12, 2), (2025, 12, 5))
+    app.notifications = []
+    app.notify = lambda message, **kwargs: app.notifications.append((message, kwargs))
+
+    async def fake_get_parameter_data(_ctx, _provider, name, start, end, paginated=False, truncated=None):
+        if truncated is not None:
+            truncated.append(True)
+        yield {"content": [{"data": [{"date": str(_ms(2025, 12, 2, 1)), "value": 1.0}]}]}
+
+    monkeypatch.setattr(must_app, "get_parameter_data", fake_get_parameter_data)
+
+    asyncio.run(app._plot_parameter("CNKA0966"))
+
+    assert len(app.notifications) == 1
+    message, kwargs = app.notifications[0]
+    assert "truncated" in kwargs.get("title", "").lower()
+    assert kwargs.get("severity") == "warning"
+    assert "CNKA0966" in message
+
+
+def test_plot_parameter_does_not_notify_when_the_data_is_complete(monkeypatch):
+    app = _app_with_range((2025, 12, 2), (2025, 12, 5))
+    app.notifications = []
+    app.notify = lambda message, **kwargs: app.notifications.append((message, kwargs))
+
+    async def fake_get_parameter_data(_ctx, _provider, name, start, end, paginated=False, truncated=None):
+        yield {"content": [{"data": [{"date": str(_ms(2025, 12, 2, 1)), "value": 1.0}]}]}
+
+    monkeypatch.setattr(must_app, "get_parameter_data", fake_get_parameter_data)
+
+    asyncio.run(app._plot_parameter("CNKA0966"))
+
+    assert app.notifications == []
 
 
 def test_toggle_plot_maximized_hides_everything_but_the_plot_and_its_controls(monkeypatch):

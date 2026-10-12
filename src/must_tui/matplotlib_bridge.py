@@ -109,7 +109,9 @@ class MatplotlibPlotter:
         self._send_state()
 
     def sync_from_plotter(self, plotter: Any) -> None:
-        self.title = plotter.title
+        # Not plotter.title: in the TUI plot each parameter name is colored (ANSI escapes) to make up for not
+        # having a real legend there. This backend does have a legend, so it gets the plain title instead.
+        self.title = plot_title(plotter.labels)
         self.data = [series[:] for series in plotter.data]
         self.time = [timestamps[:] for timestamps in plotter.time]
         self.labels = plotter.labels[:]

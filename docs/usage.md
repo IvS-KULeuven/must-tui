@@ -172,10 +172,13 @@ To keep the terminal plot fast, each trace is drawn with at most 1000 points. Lo
 reduced by keeping the minimum and maximum of each time bucket, so spikes and dips remain
 visible. The Matplotlib backend always shows the full-resolution data.
 
-Fetching a parameter with many samples in the selected time range can take a while — the whole
-data set is retrieved before anything is drawn. A spinner covers the plot area while a selection
-or a time range change is being fetched, and the **Parameter Metadata** panel's `plotted-samples`
-field shows the resulting point count once it's done.
+Fetching a parameter with many samples in the selected time range can take a while — data is
+retrieved page by page (5000 samples per request, over one reused connection, to avoid one huge
+request to the MUST server), and all of it is retrieved before anything is drawn. A spinner covers
+the plot area while a selection or a time range change is being fetched, and the **Parameter
+Metadata** panel's `plotted-samples` field shows the resulting point count once it's done. If a
+single parameter's data in the selected range is extremely large (over 5,000,000 samples), a
+notification reports that only the first part of it was loaded.
 
 Use the **Clear Plot** button (or press `c`) to reset the plot.
 

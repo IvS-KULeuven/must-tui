@@ -18,6 +18,8 @@ A terminal UI for inspecting MUST link telemetry and housekeeping parameters.
 - Multiple parameters can be plotted together; each new selection adds a trace without clearing
   previous ones.
 - The **Data Range** button sets the time range to the selected parameter's first and last sample.
+- The Y-axis auto-scales by default. The **Y Range** button sets an explicit Min/Max, or goes back
+  to auto-scaling; a locked range stays in effect until you choose Auto again.
 - The plot marker style can be cycled through four options (Braille, Standard Definition, High
   Definition, Dot).
 - Switch between the built-in terminal plot and an external Matplotlib window with the

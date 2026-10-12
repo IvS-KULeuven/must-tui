@@ -441,7 +441,7 @@ def test_reload_fetches_every_plotted_parameter_once_for_the_new_range(monkeypat
     assert app.plot_widget.labels == ["A", "B"]
     assert app.plot_widget.data == [[5.0], [7.0]]
     assert app.plot_widget.xlimits == (app.time_range.start, app.time_range.end)
-    assert app.plot_widget.ylimits == (4.0, 8.0)
+    assert app.plot_widget.ylimits is None  # auto-scaled: no manual Y range was locked
     assert app.notifications[0].startswith(f"Reloading 2 plotted parameter(s) for {period[0]} – {period[1]}")
     assert app.notifications[-1].startswith("Reloaded 2 of 2 parameter(s)")
 

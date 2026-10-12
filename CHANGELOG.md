@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A spinner now covers the parameter list while a search is in progress, so it's clear the app is working rather than stuck — without it, the debounce plus the regex/fuzzy match itself (small but not instant) could look like typing had no effect.
 - A status line above the footer shows the data provider, connection state, the number of parameters currently loaded, and how long ago the parameter cache was last refreshed.
 - `F1` opens an in-app Help screen (usage notes and the full keyboard shortcut reference), scrollable, closed with the Close button or Escape. The shortcut table is generated from the app's own key bindings, so it can't drift out of sync with them.
+- A **Y Range** button next to **Data Range** opens a small dialog to set an explicit Y-axis minimum and maximum, or go back to auto-scaling. A locked range stays in effect across new parameter selections, time range reloads, and clearing the plot, for both the TUI and Matplotlib backends, until Auto is chosen again.
 
 ### Changed
 
@@ -29,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Matplotlib plot's title no longer shows raw ANSI color codes (e.g. after switching to that backend, or after a time range change). It was picking up the TUI plot's title as-is, which is colored per parameter to make up for not having a real legend there — the Matplotlib window has a real legend and now gets the plain title.
 - The plot title now lists every currently plotted parameter (`Parameter: X` for one, `Parameters: X, Y, …` for several) instead of only the most recently selected one. This applies to both the TUI and Matplotlib plots. In the TUI plot, each name in the title is colored to match its trace — a real legend there can crash plotext (the terminal plotting library) in some situations, so this is used instead.
 - An anchored regex search (e.g. `^NC01_FRAME`) now matches the description shown in brackets in the parameter list. It previously could never match there: the label is `"MIBNAME [description]"`, so `^` on the combined label only ever matched at the MIB name's position, not the bracket's — the description is now its own, separately-anchorable search field.
+- Plotting a second parameter with a very different value range no longer clips the first one out of view in the Matplotlib backend. Each new selection used to set the Y-axis to just that one parameter's range (±1); the TUI plot never actually showed this (it was silently reset on every redraw), but Matplotlib applied it as-is. Auto mode now behaves the same, correctly, on both backends: the Y-axis fits everything currently plotted.
 
 ## [0.4.0] - 2026-10-12
 

@@ -101,6 +101,12 @@ class MatplotlibPlotter:
         self.ylimits = (ymin, ymax)
         self._send_state()
 
+    def reset_ylimits(self) -> None:
+        """Go back to auto-scaling the Y-axis to fit whatever is currently plotted."""
+
+        self.ylimits = None
+        self._send_state()
+
     def clear_plot(self) -> None:
         self.data = []
         self.time = []

@@ -9,7 +9,7 @@ their metadata, and time-series plots.
 
 ## Layout Overview
 
-The interface is divided into five main areas:
+The interface is divided into six main areas:
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -23,6 +23,8 @@ The interface is divided into five main areas:
 │                 ├────────────────────────────────────────┤
 │                 │  Plot                                  │
 ├─────────────────┴────────────────────────────────────────┤
+│  Status Line (provider, connection, catalog, cache age)  │
+├──────────────────────────────────────────────────────────┤
 │  Footer (key bindings)                                   │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -199,19 +201,24 @@ These bindings are available anywhere in the application:
 
 | Key | Action |
 |---|---|
+| `Ctrl+Q` | Quit the application |
+| `Ctrl+L` (or `c`) | Clear all traces from the plot |
+| `Ctrl+Z` | Maximize the plot and its controls, hiding everything else; press again to restore |
 | `Ctrl+J` | Toggle between **Filter** and **Jump** search mode |
-| `c` | Clear all traces from the plot |
 | `p` | Toggle plot backend between TUI (built-in) and Matplotlib |
 | `r` | Soft-refresh the parameter cache (fetches from server, keeps SQLite cache) |
 | `Ctrl+R` | Hard-reset the parameter cache (wipes SQLite cache, then re-fetches) |
 | `d` | Toggle light / dark mode |
 | `m` | Cycle plot marker style (Braille → SD → HD → Dot) |
-| `Ctrl+Z` | Maximize the plot and its controls, hiding everything else; press again to restore |
-| `Ctrl+Q` | Quit the application |
 
-The single-letter shortcuts (`c`, `p`, `r`, `d`, `m`) only work while the search box does not have
-focus — a focused text field takes plain letters as typed input first. The `Ctrl`-combinations
-always work, regardless of focus.
+Only the first three (`Ctrl+Q`, `Ctrl+L`, `Ctrl+Z`) are shown in the footer: they're the ones that
+work reliably regardless of where focus is. The rest still work as keys, but only while the search
+box does not have focus — a focused text field takes plain letters as typed input first — so they
+are left out of the footer instead of flickering in and out as focus moves around. `c` is a hidden
+alias for Clear Plot, kept for muscle memory; `Ctrl+L` is the one actually shown.
+
+The status line above the footer shows the data provider, connection state, the number of
+parameters currently loaded, and how long ago the parameter cache was last refreshed.
 
 ---
 

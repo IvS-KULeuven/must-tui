@@ -9,6 +9,7 @@ from typing import Any, cast
 from egse.env import bool_env
 from textual import log, on, work
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.css.query import NoMatches
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
@@ -71,6 +72,26 @@ SHOW_ALL_MATCHES_ID = "__show_all_matches__"
 
 PARAMETER_CACHE_MAX_AGE = datetime.timedelta(days=1)
 """The parameter catalog is re-downloaded at startup only when the cache is older than this. Press 'r' to force it."""
+
+
+def format_cache_age(updated_at: datetime.datetime | None) -> str:
+    """Return a short, human-readable age for a (timezone-aware) cache timestamp, for the status bar."""
+
+    if updated_at is None:
+        return "never"
+
+    seconds = (datetime.datetime.now(datetime.timezone.utc) - updated_at).total_seconds()
+    if seconds < 60:
+        return "just now"
+    minutes = int(seconds // 60)
+    if minutes < 60:
+        return f"{minutes}m ago"
+    hours = int(minutes // 60)
+    if hours < 24:
+        return f"{hours}h ago"
+    days = int(hours // 24)
+    return f"{days}d ago"
+
 
 SEARCH_DEBOUNCE = 0.15
 """Seconds to wait after the last keystroke before searching, so typing a word searches once instead of per key."""
@@ -495,6 +516,13 @@ class LoadingScreen(Screen[None]):
 
 
 class MainScreen(Screen[None]):
+    def on_mount(self) -> None:
+        # `switch_screen()` mounts this screen's children (built from `compose()`) in a deferred task, not
+        # synchronously -- a caller invoking `_update_status_bar()` right after `switch_screen("main")` would
+        # find `self.screen` is already this MainScreen, but `#status-bar` not yet in the DOM. `on_mount` only
+        # fires once this screen and its composed children actually exist, so it's the reliable place for this.
+        cast(Any, self.app)._update_status_bar()
+
     def compose(self) -> ComposeResult:
         app = cast(Any, self.app)
         yield Header()
@@ -517,6 +545,7 @@ class MainScreen(Screen[None]):
                     )
                     yield TimeRangeInput(app.time_range.start, app.time_range.end, id="time-range")
                 yield app.plot_widget
+        yield Static(id="status-bar")
         yield Footer()
 
 
@@ -525,15 +554,21 @@ class MUSTApp(App[None]):
     DATA_PROVIDER = "PLATO"
 
     BINDINGS = [
-        ("ctrl+j", "toggle_jump", "Toggle Jump Mode"),
-        ("c", "clear_plot", "Clear Plot"),
-        ("p", "toggle_plot_backend", "Toggle plot backend"),
-        ("r", "refresh_parameter_cache", "Refresh parameter cache"),
-        ("ctrl+r", "reset_parameter_cache", "Reset parameter cache"),
-        ("d", "app.toggle_dark", "Toggle light/dark mode"),
-        ("m", "marker", "Cycle markers"),
-        ("ctrl+z", "toggle_plot_maximized", "Maximize plot"),
-        ("ctrl+q", "app.quit", "Quit"),
+        # Shown in the footer: reliable regardless of focus, since a focused Input swallows bare letters as
+        # typed text before they reach these bindings (see the single-letter ones below). "c" is kept as a
+        # hidden alias for muscle memory, but Ctrl+L is the one actually advertised.
+        Binding("ctrl+q", "app.quit", "Quit"),
+        Binding("ctrl+l", "clear_plot", "Clear Plot"),
+        Binding("ctrl+z", "toggle_plot_maximized", "Maximize plot"),
+        # Not shown in the footer -- still work as keys, but only while focus is elsewhere (e.g. not in the
+        # search box), and would otherwise clutter the footer or flicker in and out as focus moves around.
+        Binding("c", "clear_plot", "Clear Plot", show=False),
+        Binding("ctrl+j", "toggle_jump", "Toggle Jump Mode", show=False),
+        Binding("p", "toggle_plot_backend", "Toggle plot backend", show=False),
+        Binding("r", "refresh_parameter_cache", "Refresh parameter cache", show=False),
+        Binding("ctrl+r", "reset_parameter_cache", "Reset parameter cache", show=False),
+        Binding("d", "app.toggle_dark", "Toggle light/dark mode", show=False),
+        Binding("m", "marker", "Cycle markers", show=False),
     ]
 
     MARKERS = {
@@ -641,6 +676,20 @@ class MUSTApp(App[None]):
             return True
         return datetime.datetime.now(datetime.timezone.utc) - updated_at > PARAMETER_CACHE_MAX_AGE
 
+    def _update_status_bar(self) -> None:
+        """Refresh the status bar: connection state and catalog size/cache age for `DATA_PROVIDER`."""
+
+        if not self._main_screen_active():
+            return
+        try:
+            status_bar = self.screen.query_one("#status-bar", Static)
+        except NoMatches:
+            return
+
+        state = "online" if self.must_ctx.authenticated else "offline"
+        age = format_cache_age(get_parameter_cache_updated_at(data_provider=self.DATA_PROVIDER))
+        status_bar.update(f"{self.DATA_PROVIDER} · {state} · {len(self.options):,} parameters (cache: {age})")
+
     def _main_screen_active(self) -> bool:
         return isinstance(self.screen, MainScreen)
 
@@ -692,6 +741,7 @@ class MUSTApp(App[None]):
                 option_list.set_options(self.visible_options(self.options))
             else:
                 self.update_search()
+        self._update_status_bar()
 
     @staticmethod
     def visible_options(matches: list[str]) -> list[str | Option]:

@@ -59,6 +59,12 @@ OptionList {
     height: 3;
 }
 
+#status-bar {
+    height: 1;
+    color: $text-muted;
+    padding: 0 1;
+}
+
 /* Textual's default Button style reverses the label text on focus (which a click leaves behind); show the
    already-present subtle background tint instead of reversing the text. */
 #plot-controls Button:focus {
@@ -74,7 +80,8 @@ MainScreen.-plot-maximized Header,
 MainScreen.-plot-maximized Footer,
 MainScreen.-plot-maximized #input-container,
 MainScreen.-plot-maximized OptionList,
-MainScreen.-plot-maximized #info-container {
+MainScreen.-plot-maximized #info-container,
+MainScreen.-plot-maximized #status-bar {
     display: none;
 }
 

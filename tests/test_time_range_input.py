@@ -9,10 +9,13 @@ from textual.widgets import Button, Checkbox, Input
 
 import must_tui.must_app as must_app
 from must_tui.must_app import ParameterMetadata
-from must_tui.time_range_input import TimeRange, TimeRangeInput, parse_datetime
+from must_tui.time_range_input import TimeRange, TimeRangeInput, format_datetime, parse_datetime
 
 START = dt.datetime(2025, 12, 2)
 END = dt.datetime(2025, 12, 5)
+
+
+NOW = dt.datetime(2026, 10, 11, 9, 30, 15, 123456)
 
 
 @pytest.mark.parametrize(
@@ -24,18 +27,51 @@ END = dt.datetime(2025, 12, 5)
         ("2025-10-01T13:45:07", dt.datetime(2025, 10, 1, 13, 45, 7)),
         ("  2025-03-09   08:00  ", dt.datetime(2025, 3, 9, 8)),
         ("NOW", dt.datetime(2026, 10, 11, 9, 30, 15)),
+        ("today", dt.datetime(2026, 10, 11)),
+        ("TODAY", dt.datetime(2026, 10, 11)),
+        ("yesterday", dt.datetime(2026, 10, 10)),
+        ("tomorrow", dt.datetime(2026, 10, 12)),
+        ("now-6h", dt.datetime(2026, 10, 11, 3, 30, 15)),
+        ("now+6h", dt.datetime(2026, 10, 11, 15, 30, 15)),
+        ("-2h30m", dt.datetime(2026, 10, 11, 7, 0, 15)),
+        ("- 2h 30m", dt.datetime(2026, 10, 11, 7, 0, 15)),
+        ("now - 1d2h3m4s", dt.datetime(2026, 10, 10, 7, 27, 11)),
+        ("yesterday-3h", dt.datetime(2026, 10, 9, 21)),
+        ("tomorrow+1w", dt.datetime(2026, 10, 19)),
+        ("-1W", dt.datetime(2026, 10, 4, 9, 30, 15)),
     ],
 )
 def test_parse_datetime_accepts(text, expected):
-    assert parse_datetime(text, now=dt.datetime(2026, 10, 11, 9, 30, 15, 123456)) == expected
+    assert parse_datetime(text, now=NOW) == expected
 
 
 @pytest.mark.parametrize(
-    "text", ["", "2025-13-01", "2025-11-31", "2025-10", "yesterday", "2025-10-01 25:00", "0999-01-01", "0025-10-01"]
+    "text",
+    [
+        "",
+        "2025-13-01",
+        "2025-11-31",
+        "2025-10",
+        "2025-10-01 25:00",
+        "0999-01-01",
+        "0025-10-01",
+        "now-",
+        "now-6",
+        "now-6x",
+        "6h",
+        "now 6h",
+        "yesterdayish",
+    ],
 )
 def test_parse_datetime_rejects(text):
     with pytest.raises(ValueError, match="not a valid date-time"):
-        parse_datetime(text)
+        parse_datetime(text, now=NOW)
+
+
+@pytest.mark.parametrize("text", ["-999999999d", "+999999999w"])
+def test_parse_datetime_rejects_relative_out_of_range(text):
+    with pytest.raises(ValueError, match="out of range"):
+        parse_datetime(text, now=NOW)
 
 
 class _Host(App):
@@ -163,6 +199,173 @@ def test_escape_commits_a_pending_valid_edit_like_a_blur():
         assert before_escape == []
         assert app.changes == [TimeRange(dt.datetime(2025, 10, 1), END)]
         assert app.screen.focused is None
+
+    _run(test)
+
+
+async def _step(pilot, field_id, cursor, key):
+    field = pilot.app.query_one(field_id, Input)
+    field.focus()
+    field.cursor_position = cursor
+    await pilot.pause()
+    changes_before = list(pilot.app.changes)
+    await pilot.press(key)
+    await pilot.pause()
+    return field, changes_before
+
+
+def test_up_down_step_year_without_applying():
+    async def test(app, pilot):
+        field, before = await _step(pilot, "#time-range-start", 2, "up")
+        assert before == []
+        assert field.value == "2026-12-02 00:00:00"
+        assert field.cursor_position == 2
+        assert app.changes == []  # stepping alone never applies
+
+        await pilot.press("down")
+        await pilot.pause()
+        assert field.value == "2025-12-02 00:00:00"
+
+    _run(test)
+
+
+@pytest.mark.parametrize(
+    "cursor, expected_up, expected_down",
+    [
+        (6, "2026-01-02 00:00:00", "2025-11-02 00:00:00"),  # month
+        (9, "2025-12-03 00:00:00", "2025-12-01 00:00:00"),  # day
+        (12, "2025-12-02 01:00:00", "2025-12-01 23:00:00"),  # hour
+        (15, "2025-12-02 00:01:00", "2025-12-01 23:59:00"),  # minute
+        (18, "2025-12-02 00:00:01", "2025-12-01 23:59:59"),  # second
+    ],
+)
+def test_up_down_step_the_segment_under_the_cursor(cursor, expected_up, expected_down):
+    async def test(app, pilot):
+        field, _ = await _step(pilot, "#time-range-start", cursor, "up")
+        assert field.value == expected_up
+        field.cursor_position = cursor
+        await pilot.press("down")
+        await pilot.press("down")
+        await pilot.pause()
+        assert field.value == expected_down
+        assert app.changes == []
+
+    _run(test)
+
+
+def test_up_clamps_to_the_last_day_of_a_shorter_month():
+    async def test(app, pilot):
+        field = app.query_one("#time-range-start", Input)
+        field.value = "2025-01-31 00:00:00"
+        field.focus()
+        field.cursor_position = 6
+        await pilot.pause()
+        await pilot.press("up")
+        await pilot.pause()
+        assert field.value == "2025-02-28 00:00:00"
+
+    _run(test)
+
+
+def test_up_clamps_a_leap_day_on_a_non_leap_year():
+    async def test(app, pilot):
+        field = app.query_one("#time-range-start", Input)
+        field.value = "2024-02-29 00:00:00"
+        field.focus()
+        field.cursor_position = 2
+        await pilot.pause()
+        await pilot.press("up")
+        await pilot.pause()
+        assert field.value == "2025-02-28 00:00:00"
+
+    _run(test)
+
+
+def test_stepping_past_the_year_bounds_is_a_no_op():
+    async def test(app, pilot):
+        field = app.query_one("#time-range-start", Input)
+        field.value = "9999-12-31 23:59:59"
+        field.focus()
+        field.cursor_position = 2
+        await pilot.pause()
+        await pilot.press("up")
+        await pilot.pause()
+        assert field.value == "9999-12-31 23:59:59"
+
+        field.value = "1000-01-01 00:00:00"
+        field.cursor_position = 2
+        await pilot.press("down")
+        await pilot.pause()
+        assert field.value == "1000-01-01 00:00:00"
+
+    _run(test)
+
+
+def test_stepping_a_day_rolls_over_into_the_next_year():
+    async def test(app, pilot):
+        field = app.query_one("#time-range-start", Input)
+        field.value = "2025-12-31 23:59:59"
+        field.focus()
+        field.cursor_position = 9
+        await pilot.pause()
+        await pilot.press("up")
+        await pilot.pause()
+        assert field.value == "2026-01-01 23:59:59"
+
+    _run(test)
+
+
+def test_stepping_invalid_text_does_nothing():
+    async def test(app, pilot):
+        field = app.query_one("#time-range-start", Input)
+        field.value = "2025-11-31"
+        field.focus()
+        field.cursor_position = 9
+        await pilot.pause()
+        await pilot.press("up")
+        await pilot.pause()
+        assert field.value == "2025-11-31"
+        assert app.changes == []
+
+    _run(test)
+
+
+def test_stepping_relative_text_materializes_it_first():
+    async def test(app, pilot):
+        field = app.query_one("#time-range-start", Input)
+        field.value = "today"
+        field.focus()
+        field.cursor_position = 2  # year segment
+        await pilot.pause()
+        today = dt.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        await pilot.press("up")
+        await pilot.pause()
+        # "today" (this year, midnight) is materialized first, then Up increments the year under the cursor
+        assert field.value == format_datetime(today.replace(year=today.year + 1))
+        assert app.changes == []
+
+    _run(test)
+
+
+def test_a_stepped_value_is_applied_on_enter():
+    async def test(app, pilot):
+        field, _ = await _step(pilot, "#time-range-start", 9, "up")  # day
+        assert field.value == "2025-12-03 00:00:00"
+        assert app.changes == []
+
+        await pilot.press("enter")
+        await pilot.pause()
+        assert app.changes == [TimeRange(dt.datetime(2025, 12, 3), END)]
+
+    _run(test)
+
+
+def test_up_down_also_steps_the_end_field():
+    async def test(app, pilot):
+        field, before = await _step(pilot, "#time-range-end", 9, "up")  # day
+        assert before == []
+        assert field.value == "2025-12-06 00:00:00"
+        assert app.changes == []
 
     _run(test)
 

@@ -2,12 +2,15 @@
 
 Two plain text fields and a "Lock" checkbox. A field is only applied when the user presses Enter or leaves it, and
 only when the resulting range is valid; then one `TimeRangeInput.Changed` message is posted. Typing does not send
-anything, so the app never sees half-edited or start-after-end ranges.
+anything, so the app never sees half-edited or start-after-end ranges. The Up/Down arrow keys step the date-time
+component under the cursor (year, month, ..., second) in the focused field's text, without applying it.
 """
 
 from __future__ import annotations
 
+import calendar
 import datetime
+import re
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -23,6 +26,67 @@ DISPLAY_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 INPUT_FORMATS = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d")
 """Accepted input formats; a missing time or missing seconds means 0."""
+
+_WORD_OFFSETS = {
+    "today": datetime.timedelta(0),
+    "yesterday": datetime.timedelta(days=-1),
+    "tomorrow": datetime.timedelta(days=1),
+}
+"""Anchor words that snap to local midnight. `now` is handled separately, to the second."""
+
+_OFFSET_UNITS = {"w": "weeks", "d": "days", "h": "hours", "m": "minutes", "s": "seconds"}
+"""Units accepted in a relative offset. Months/years are excluded: a calendar month or year has no fixed duration."""
+
+_OFFSET_TOKEN_RE = re.compile(r"(\d+)\s*([wdhms])", re.IGNORECASE)
+
+_RELATIVE_RE = re.compile(
+    r"^(?P<anchor>now|today|yesterday|tomorrow)?"
+    r"(?:\s*(?P<sign>[+-])\s*(?P<offset>(?:\d+\s*[wdhms]\s*)+))?$",
+    re.IGNORECASE,
+)
+"""An optional anchor word, optionally followed by a signed offset such as `-6h` or `+1w2d3h`.
+
+A bare offset (no anchor word) is relative to `now`. The sign is mandatory on the offset, so e.g. `6h` alone
+(ambiguous: before or after the anchor?) is not accepted, only `-6h` or `+6h`.
+"""
+
+
+def _parse_relative(text: str, now: datetime.datetime) -> datetime.datetime | None:
+    """Resolve a relative expression like `now-6h`, `-2h30m` or `yesterday` to an absolute date-time.
+
+    Returns `None` when `text` does not look like a relative expression at all, so the caller can try the
+    absolute formats next.
+
+    Raises:
+        ValueError: when `text` is a syntactically valid relative expression that resolves out of range.
+    """
+
+    match = _RELATIVE_RE.match(text)
+    if not match or not (match.group("anchor") or match.group("offset")):
+        return None
+
+    anchor_word = (match.group("anchor") or "now").casefold()
+    if anchor_word == "now":
+        anchor = now.replace(microsecond=0)
+    else:
+        midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        anchor = midnight + _WORD_OFFSETS[anchor_word]
+
+    offset_text = match.group("offset")
+    if offset_text:
+        kwargs: dict[str, int] = {}
+        for amount, unit in _OFFSET_TOKEN_RE.findall(offset_text):
+            key = _OFFSET_UNITS[unit.lower()]
+            kwargs[key] = kwargs.get(key, 0) + int(amount)
+        try:
+            delta = datetime.timedelta(**kwargs)
+            anchor = anchor - delta if match.group("sign") == "-" else anchor + delta
+        except OverflowError:
+            raise ValueError(f"'{text}' is out of range.") from None
+
+    if not (1000 <= anchor.year <= 9999):
+        raise ValueError(f"'{text}' is out of range.") from None
+    return anchor
 
 
 @dataclass(frozen=True)
@@ -42,15 +106,20 @@ def parse_datetime(text: str, now: datetime.datetime | None = None) -> datetime.
     """Parse a date-time typed by the user.
 
     Accepts `YYYY-MM-DD HH:MM:SS`, `YYYY-MM-DD HH:MM`, `YYYY-MM-DD` (also with a `T` between date and time),
-    and `now` (the current local time, to the second).
+    `now`, `today`, `yesterday`, `tomorrow`, and any of those with a signed offset such as `now-6h`, `-2h30m`
+    or `tomorrow+1d` (units: `w`eeks, `d`ays, `h`ours, `m`inutes, `s`econds; a bare offset is relative to `now`).
 
     Raises:
         ValueError: with a message that can be shown to the user.
     """
 
-    text = " ".join(text.strip().replace("T", " ").split())
-    if text.casefold() == "now":
-        return (now or datetime.datetime.now()).replace(microsecond=0)
+    # Only an ISO "T" between digits (e.g. "2025-10-01T13:45:07") is a separator; "TODAY"/"TOMORROW" must survive.
+    text = " ".join(re.sub(r"(?<=\d)T(?=\d)", " ", text.strip()).split())
+    now = now or datetime.datetime.now()
+
+    relative = _parse_relative(text, now)
+    if relative is not None:
+        return relative
 
     for fmt in INPUT_FORMATS:
         try:
@@ -61,17 +130,81 @@ def parse_datetime(text: str, now: datetime.datetime | None = None) -> datetime.
         if value.year >= 1000:
             return value
 
-    raise ValueError(f"'{text}' is not a valid date-time; use YYYY-MM-DD [HH:MM[:SS]] or 'now'.")
+    raise ValueError(
+        f"'{text}' is not a valid date-time; use YYYY-MM-DD [HH:MM[:SS]], 'now'/'today'/'yesterday'/'tomorrow', "
+        "or one of those with an offset such as 'now-6h' or '-2h30m'."
+    )
+
+
+# Cursor-position ranges (inclusive) mapped to the date-time component they fall in or next to, for the fixed-width
+# "YYYY-MM-DD HH:MM:SS" display format. E.g. a cursor at the trailing separator falls back to the component before it.
+_SEGMENT_SPANS: tuple[tuple[int, int, str], ...] = (
+    (0, 4, "year"),
+    (5, 7, "month"),
+    (8, 10, "day"),
+    (11, 13, "hour"),
+    (14, 16, "minute"),
+    (17, 19, "second"),
+)
+
+_UNIT_DELTAS = {
+    "day": datetime.timedelta(days=1),
+    "hour": datetime.timedelta(hours=1),
+    "minute": datetime.timedelta(minutes=1),
+    "second": datetime.timedelta(seconds=1),
+}
+
+
+def _segment_at(cursor: int) -> str:
+    for start, end, unit in _SEGMENT_SPANS:
+        if start <= cursor <= end:
+            return unit
+    return "second"
+
+
+def _step_month(value: datetime.datetime, delta: int) -> datetime.datetime:
+    month_index = value.year * 12 + (value.month - 1) + delta
+    year, month = divmod(month_index, 12)
+    month += 1
+    day = min(value.day, calendar.monthrange(year, month)[1])
+    return value.replace(year=year, month=month, day=day)
+
+
+def _step_year(value: datetime.datetime, delta: int) -> datetime.datetime:
+    year = value.year + delta
+    day = min(value.day, calendar.monthrange(year, value.month)[1])
+    return value.replace(year=year, day=day)
+
+
+def _step_value(value: datetime.datetime, unit: str, delta: int) -> datetime.datetime | None:
+    """Step one date-time component by `delta` units, or `None` if that would go out of the accepted range."""
+
+    try:
+        if unit == "year":
+            stepped = _step_year(value, delta)
+        elif unit == "month":
+            stepped = _step_month(value, delta)
+        else:
+            stepped = value + delta * _UNIT_DELTAS[unit]
+    except (OverflowError, ValueError):
+        return None
+    return stepped if 1000 <= stepped.year <= 9999 else None
 
 
 class TimeRangeInput(Horizontal):
     """Start and end date-time fields, with an option to keep the duration fixed.
 
     Posts `TimeRangeInput.Changed` once per accepted change (Enter or leaving a field). Invalid input is marked in
-    red, explained in a notification, and leaves the current range unchanged.
+    red, explained in a notification, and leaves the current range unchanged. The Up/Down arrow keys step the
+    component under the cursor (year, month, ..., second) in the focused field's text only; Enter/blur/Escape
+    still apply it, the same as any other edit.
     """
 
-    BINDINGS: ClassVar[list[Binding]] = [Binding("escape", "defocus", "Defocus", show=False)]
+    BINDINGS: ClassVar[list[Binding]] = [
+        Binding("escape", "defocus", "Defocus", show=False),
+        Binding("up", "step_field(1)", "Increment", show=False),
+        Binding("down", "step_field(-1)", "Decrement", show=False),
+    ]
 
     DEFAULT_CSS: ClassVar[str] = """
     TimeRangeInput {
@@ -137,6 +270,28 @@ class TimeRangeInput(Horizontal):
 
         if self.screen.focused in self.query("Input, Checkbox"):
             self.screen.set_focus(None)
+
+    def action_step_field(self, delta: int) -> None:
+        """Step the date-time component under the cursor in the focused field (Up/Down), without applying it."""
+
+        field = self.screen.focused
+        if not isinstance(field, Input) or field not in self.query(Input):
+            return
+
+        try:
+            value = parse_datetime(field.value)
+        except ValueError:
+            return  # don't guess at invalid or incomplete text
+
+        cursor = min(field.cursor_position, _SEGMENT_SPANS[-1][1])
+        stepped = _step_value(value, _segment_at(cursor), delta)
+        if stepped is None:
+            return
+
+        with field.prevent(Input.Changed):
+            field.value = format_datetime(stepped)
+            field.remove_class("-invalid")
+            field.cursor_position = cursor
 
     @on(Input.Changed)
     def _editing(self, event: Input.Changed) -> None:

@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changing the time range now fetches the plotted parameters again for the new range (previously only the x-axis moved, leaving parts of the range without data). Notifications report the reload and any parameter without data in the new range, which is removed from the plot.
 - `Escape` leaves a focused time range field, committing a pending valid edit first, like pressing `Tab` does.
 - A **Data Range** button sets the time range to the selected parameter's first and last sample, as reported by MUST.
+- The time range fields accept relative date-times: `now`, `today`, `yesterday`, `tomorrow`, and any of those with a signed offset such as `now-6h`, `tomorrow+1d` or a bare `-2h30m` (relative to `now`), using `w`/`d`/`h`/`m`/`s` units.
+- `↑`/`↓` step the date-time component (year, month, day, hour, minute, second) under the cursor in a time range field, up or down by one, without applying the field. A relative expression is resolved to an absolute date-time first. Day/month stepping clamps to the last valid day of the month; stepping past year 1000 or 9999 does nothing.
 
 ### Fixed
 

@@ -130,9 +130,24 @@ A toolbar between the info panels and the plot area:
 | **Lock** checkbox | Keep the duration fixed: changing one end moves the other end along |
 
 Type a date-time as `YYYY-MM-DD HH:MM:SS`. Shorter forms are accepted too: `YYYY-MM-DD HH:MM`
-(seconds 0) and `YYYY-MM-DD` (midnight), and `now` for the current local time. A field is applied
-when you press **Enter** or leave it (e.g. with **Tab**); typing alone changes nothing. **Escape**
-leaves the field, committing a pending valid edit first, the same as **Tab**.
+(seconds 0) and `YYYY-MM-DD` (midnight). A field is applied when you press **Enter** or leave it
+(e.g. with **Tab**); typing alone changes nothing. **Escape** leaves the field, committing a
+pending valid edit first, the same as **Tab**.
+
+Relative forms are also accepted, resolved against the current local time:
+
+- `now`, `today`, `yesterday`, `tomorrow` — `today`/`yesterday`/`tomorrow` snap to local midnight;
+  `now` keeps the current time, to the second.
+- Any of those with a signed offset, e.g. `now-6h`, `tomorrow+1d`, `yesterday-3h`. The offset uses
+  `w`eeks, `d`ays, `h`ours, `m`inutes and `s`econds, and they can be combined: `now-1d2h30m`.
+- A bare offset such as `-2h30m` or `+1w` is relative to `now`. The sign is required (`6h` alone is
+  rejected as ambiguous).
+
+**↑ / ↓** step the date-time component the cursor is on (year, month, day, hour, minute, second) up
+or down by one, directly in the field's text — without applying it, so pending edits are still only
+applied on **Enter**/**Tab**/**Escape**. Stepping a relative expression first resolves it to an
+absolute date-time, then steps it. Stepping the day/month clamps to the last valid day of the
+resulting month (e.g. 31 Jan + 1 month → 28 Feb); stepping past year 1000 or 9999 does nothing.
 
 If the text is not a valid date-time, or the start would not be before the end, the field turns red,
 a notification explains why, and the time range stays as it was. Editing the field removes the red

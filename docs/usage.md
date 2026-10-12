@@ -44,9 +44,13 @@ The search box at the top filters or navigates the parameter list as you type.
 The **Regex** checkbox (top-right of the search bar) switches between regex and fuzzy matching
 while in filter mode.
 
-The search runs once you pause typing for a moment, not on every keystroke. While a regular
-expression is incomplete or invalid (e.g. an unclosed parenthesis), the list keeps showing the
-previous matches.
+The search checks the MIB name, the description shown in brackets in the list, and the MUST/PCF
+extended description — each as its own field, so an anchored pattern like `^NC01_FRAME` matches
+the bracketed description directly, not just where it happens to sit inside the full list entry.
+
+The search runs once you pause typing for a moment, not on every keystroke, and a spinner covers
+the parameter list while it's running. While a regular expression is incomplete or invalid (e.g.
+an unclosed parenthesis), the list keeps showing the previous matches.
 
 ### Parameter List
 
@@ -57,10 +61,12 @@ provider.  Each entry is shown as:
 MIBNAME [Description]
 ```
 
-To keep the interface responsive, the list shows at most 500 parameters at a time. When more
-parameters match, the last entry says how many were left out; refine the search to see them.
+To keep the interface responsive, the list shows at most 500 parameters at a time out of however
+many currently match. When there are more, the last entry reports how many are left out; select it
+(or press **Enter** while it's highlighted) to load all of them — this can take a few seconds for a
+very large, unfiltered list — or refine the search instead to narrow it down.
 
-Scroll through the list with the arrow keys or the mouse.  Press **Enter** (or click) to select
+Scroll through the list with the arrow keys or the mouse. Press **Enter** (or click) to select
 a parameter — this loads its MIB info, server metadata, and time-series data into the other panels.
 Server data is loaded in the background, so the interface stays responsive. If you select another
 parameter before the previous one has finished loading, the previous request is cancelled and only

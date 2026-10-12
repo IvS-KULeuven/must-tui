@@ -8,14 +8,14 @@ import must_tui.must_app as must_app
 from must_tui.must_app import match_options
 
 FIELDS = [
-    ("CNKA0960 [NC11_TOU_SENSE_1]", "CNKA0960", "NC11 N-FEE housekeeping parameter TOU sensor 1"),
-    ("CNKA0966 [NC11_CCD1_TS]", "CNKA0966", "NC11 N-FEE housekeeping parameter CCD 1 temperature"),
-    ("CNKA0970 [NC11_PRT1]", "CNKA0970", "NC11 N-FEE housekeeping parameter PRT 1"),
-    ("CNAA0966 [NC01_CCD1_TS]", "CNAA0966", "NC01 N-FEE housekeeping parameter CCD 1 temperature"),
-    ("DFAW0104 [FD1_TEMP_CCD1]", "DFAW0104", "FD1 F-CAM CCD1 temperature"),
-    ("A98A0413 [TANK_TEMP_MEDIAN]", "A98A0413", "TM_152_TANK_TEMP_MEDIAN_152"),
-    ("X0000001 [no description]", "X0000001", ""),
-    ("X0000002 [no description]", "X0000002", ""),
+    ("CNKA0960 [NC11_TOU_SENSE_1]", "CNKA0960", "NC11_TOU_SENSE_1", "NC11 N-FEE housekeeping parameter TOU sensor 1"),
+    ("CNKA0966 [NC11_CCD1_TS]", "CNKA0966", "NC11_CCD1_TS", "NC11 N-FEE housekeeping parameter CCD 1 temperature"),
+    ("CNKA0970 [NC11_PRT1]", "CNKA0970", "NC11_PRT1", "NC11 N-FEE housekeeping parameter PRT 1"),
+    ("CNAA0966 [NC01_CCD1_TS]", "CNAA0966", "NC01_CCD1_TS", "NC01 N-FEE housekeeping parameter CCD 1 temperature"),
+    ("DFAW0104 [FD1_TEMP_CCD1]", "DFAW0104", "FD1_TEMP_CCD1", "FD1 F-CAM CCD1 temperature"),
+    ("A98A0413 [TANK_TEMP_MEDIAN]", "A98A0413", "TANK_TEMP_MEDIAN", "TM_152_TANK_TEMP_MEDIAN_152"),
+    ("X0000001 [no description]", "X0000001", "no description", ""),
+    ("X0000002 [no description]", "X0000002", "no description", ""),
 ]
 
 
@@ -42,6 +42,14 @@ def test_regex_is_case_insensitive_matches_any_field_and_keeps_order():
     assert match_options("tank_temp_median_152$", FIELDS, "regex") == [5]  # description_2 only
 
 
+def test_regex_anchor_matches_the_bracketed_description_directly():
+    # The label is "CNKA0966 [NC11_CCD1_TS]" -- `^` on the label alone can only ever match at the mib_name's
+    # position (0), never at the bracket's. The description is its own, separately-anchorable field so an
+    # anchored search for what's visibly shown in brackets still works.
+    assert match_options("^NC11_CCD1_TS$", FIELDS, "regex") == [1]
+    assert match_options("^NC01_CCD1_TS$", FIELDS, "regex") == [3]
+
+
 def test_invalid_regex_raises():
     with pytest.raises(re.error):
         match_options("NC11_(", FIELDS, "regex")
@@ -59,13 +67,13 @@ def test_fuzzy_and_jump_match_the_original_thefuzz_loop(monkeypatch, chunk_size,
 
 def test_jump_picks_the_first_of_equal_best_scores(monkeypatch):
     monkeypatch.setattr(must_app, "SEARCH_CHUNK_SIZE", 1)
-    fields = [("aaa", "", ""), ("NC11", "", ""), ("bbb", "", ""), ("NC11", "", "")]
+    fields = [("aaa", "", "", ""), ("NC11", "", "", ""), ("bbb", "", "", ""), ("NC11", "", "", "")]
 
     assert match_options("NC11", fields, "jump") == [1]
 
 
 def test_fuzzy_limits_the_number_of_matches():
-    fields = [(f"NC11_PAR_{i:04d}", "", "") for i in range(must_app.MAX_FUZZY_MATCHES + 50)]
+    fields = [(f"NC11_PAR_{i:04d}", "", "", "") for i in range(must_app.MAX_FUZZY_MATCHES + 50)]
 
     assert len(match_options("NC11_PAR", fields, "fuzzy")) == must_app.MAX_FUZZY_MATCHES
 

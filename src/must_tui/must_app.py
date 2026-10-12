@@ -66,6 +66,9 @@ MAX_PLOT_POINTS = 1000
 MAX_VISIBLE_OPTIONS = 500
 """Maximum number of parameters shown in the option list. Refilling the list with all ~70k parameters takes seconds."""
 
+SHOW_ALL_MATCHES_ID = "__show_all_matches__"
+"""Option id of the selectable hint shown when matches are truncated; selecting it loads the full match list."""
+
 PARAMETER_CACHE_MAX_AGE = datetime.timedelta(days=1)
 """The parameter catalog is re-downloaded at startup only when the cache is older than this. Press 'r' to force it."""
 
@@ -78,8 +81,13 @@ FUZZY_MIN_SCORE = 50
 SEARCH_CHUNK_SIZE = 4096
 """Number of options scored per rapidfuzz call; each call blocks the UI thread until it returns (a few ms)."""
 
-SearchFields = tuple[str, str, str]
-"""The option label, MIB name and PCF description_2 of one parameter, the fields that are searched."""
+SearchFields = tuple[str, str, str, str]
+"""The option label, MIB name, the label's bracketed description, and PCF description_2 of one parameter.
+
+The bracketed description is also a substring of the label (`"{mib_name} [{description}]"`), but as its own,
+separately-anchorable field: an anchored regex like `^NC01_FRAME` can otherwise never match it, since `^` on
+the label only ever matches at the mib_name's position (position 0), not at the bracket's.
+"""
 
 
 def match_options(search: str, fields: list[SearchFields], mode: str) -> list[int]:
@@ -98,7 +106,11 @@ def match_options(search: str, fields: list[SearchFields], mode: str) -> list[in
 
     if mode == "regex":
         pattern = re.compile(search, re.IGNORECASE).search
-        return [idx for idx, (label, name, desc) in enumerate(fields) if pattern(label) or pattern(name) or pattern(desc)]
+        return [
+            idx
+            for idx, (label, name, description, description_2) in enumerate(fields)
+            if pattern(label) or pattern(name) or pattern(description) or pattern(description_2)
+        ]
 
     # rapidfuzz scores many strings in one C call; `thefuzz.fuzz.partial_ratio` is the same scorer, one pair at a time.
     # A C call holds the GIL until it returns, so the options are scored in chunks to let the UI thread run in between.
@@ -546,10 +558,13 @@ class MUSTApp(App[None]):
         self.pars_info: dict = {}
         self.pars_catalog: dict = {}
         self.pars_mapping: dict = {}
+        self.pars_descriptions: dict[str, str] = {}
         self.options: list[str] = sorted(self.pars_mapping.keys())
         self.search_fields: list[SearchFields] = []
         self.jump = False
         self._jump_window_start: int | None = None
+        self._current_matches: list[str] = self.options
+        self._search_generation: int = 0
         self.fuzz = False
         self.markers = cycle(self.MARKERS.keys())
         self.plot_widget: TimeRangePlotter = TimeRangePlotter(self.must_ctx)
@@ -645,6 +660,7 @@ class MUSTApp(App[None]):
     def _apply_parameter_catalog(self, catalog: dict[str, dict[str, str]]) -> None:
         self.pars_catalog = catalog
         self.pars_mapping = {}
+        self.pars_descriptions = {}
 
         for mib_name, metadata in sorted(catalog.items()):
             must_description = (metadata.get("description") or "").strip()
@@ -658,6 +674,7 @@ class MUSTApp(App[None]):
                 description = pcf_description or pcf_description_2
             if not description:
                 description = "no description"
+            self.pars_descriptions[mib_name] = description
 
             label = f"{mib_name} [{description}]"
             if label in self.pars_mapping and self.pars_mapping[label] != mib_name:
@@ -667,6 +684,7 @@ class MUSTApp(App[None]):
         self.options = sorted(self.pars_mapping.keys())
         self.search_fields = [self._option_search_fields(opt) for opt in self.options]
         self._jump_window_start = None
+        self._current_matches = self.options
         controls = self._get_main_controls()
         if controls is not None:
             search_input, option_list = controls
@@ -677,22 +695,50 @@ class MUSTApp(App[None]):
 
     @staticmethod
     def visible_options(matches: list[str]) -> list[str | Option]:
-        """Return at most MAX_VISIBLE_OPTIONS matches, plus a disabled hint when more were left out."""
+        """Return at most MAX_VISIBLE_OPTIONS matches, plus a selectable hint when more were left out."""
 
         if len(matches) <= MAX_VISIBLE_OPTIONS:
             return list(matches)
 
         hidden = len(matches) - MAX_VISIBLE_OPTIONS
-        hint = Option(f"… {hidden} more matches, refine the search to see them", disabled=True)
+        hint = Option(
+            f"… {hidden} more matches — press Enter to show all, or refine the search",
+            id=SHOW_ALL_MATCHES_ID,
+        )
         return [*matches[:MAX_VISIBLE_OPTIONS], hint]
 
-    def _option_search_fields(self, option_label: str) -> tuple[str, str, str]:
-        """Return label, MIB name, and PCF description_2 for searching."""
+    def _show_all_current_matches(self) -> None:
+        """Replace the truncated option list with the full current match list (catalog or search results).
+
+        `set_options()` on the full ~70k catalog takes ~2.7s and blocks the UI thread (see CLAUDE.md's
+        performance notes) -- it's only ever called here, as an explicit, informed user action, never
+        automatically. `loading` and the notification are set before that freeze, via `call_after_refresh`,
+        so both actually paint first -- same `Widget.loading` spinner pattern used for plot fetches.
+        """
+
+        controls = self._get_main_controls()
+        if controls is None:
+            return
+        _, option_list = controls
+        matches = self._current_matches
+
+        option_list.loading = True
+        self.notify(f"Loading all {len(matches):,} matches…")
+        self.call_after_refresh(self._finish_showing_all_matches, option_list, matches)
+
+    @staticmethod
+    def _finish_showing_all_matches(option_list: OptionList, matches: list[str]) -> None:
+        option_list.set_options(matches)
+        option_list.loading = False
+
+    def _option_search_fields(self, option_label: str) -> SearchFields:
+        """Return label, MIB name, the label's bracketed description, and PCF description_2 for searching."""
 
         mib_name = self.pars_mapping.get(option_label, "")
         mib_info = self.pars_info.get(mib_name, {}) if isinstance(self.pars_info, dict) else {}
+        description = self.pars_descriptions.get(mib_name, "")
         description_2 = str(mib_info.get("description_2", ""))
-        return option_label, mib_name, description_2
+        return option_label, mib_name, description, description_2
 
     async def refresh_parameter_catalog(self, force_refresh: bool = False) -> None:
         if not self.must_ctx.authenticated:
@@ -1048,8 +1094,15 @@ class MUSTApp(App[None]):
         self.update_search()
 
     @on(OptionList.OptionSelected)
+    def expand_to_all_matches(self, event: OptionList.OptionSelected) -> None:
+        if event.option.id != SHOW_ALL_MATCHES_ID:
+            return
+        event.stop()
+        self._show_all_current_matches()
+
+    @on(OptionList.OptionSelected)
     async def show_parameter_info(self, event: OptionList.OptionSelected) -> None:
-        if not self._main_screen_active():
+        if event.option.id == SHOW_ALL_MATCHES_ID or not self._main_screen_active():
             return
 
         log.debug(f"{event.option=}")
@@ -1069,7 +1122,7 @@ class MUSTApp(App[None]):
 
     @on(OptionList.OptionSelected)
     async def show_parameter_metadata(self, event: OptionList.OptionSelected) -> None:
-        if not self._main_screen_active():
+        if event.option.id == SHOW_ALL_MATCHES_ID or not self._main_screen_active():
             return
 
         log.debug(f"{event.option=}")
@@ -1114,23 +1167,41 @@ class MUSTApp(App[None]):
         search_input, option_list = controls
         self.workers.cancel_group(self, "search")
         if search_input.value == "":
+            option_list.loading = False
             if not self.jump:
+                self._current_matches = self.options
                 option_list.set_options(self.visible_options(self.options))
             return
 
-        self.search_options(search_input.value, self._search_mode())
+        option_list.loading = True
+        self._search_generation += 1
+        self.search_options(search_input.value, self._search_mode(), self._search_generation)
 
     @work(exclusive=True, group="search", exit_on_error=False)
-    async def search_options(self, search: str, mode: str) -> None:
+    async def search_options(self, search: str, mode: str, generation: int) -> None:
         """Search the ~70k options on a thread, so typing stays responsive.
 
         Being exclusive, every keystroke cancels the previous search while it is still waiting out the debounce.
         A search that is already running on the thread can't be stopped, so its result is dropped when the search
-        text, the mode or the catalog changed in the meantime.
+        text, the mode or the catalog changed in the meantime. `option_list.loading` (set by the caller before
+        this worker starts) covers the debounce + match time with a spinner, so typing doesn't look like it did
+        nothing -- the combined delay (debounce plus the regex/fuzzy match itself) is small but not instant.
+
+        `generation` guards against a race on that shared `loading` flag: if this worker is cancelled, its
+        `finally` can still run after a newer keystroke has already started a new worker and set `loading`
+        back to True, since cancellation only takes effect at the next `await`, not synchronously. Clearing
+        `loading` only when `generation` is still the latest one avoids an old, superseded worker turning the
+        spinner off for a search that is still in progress.
         """
 
-        await asyncio.sleep(SEARCH_DEBOUNCE)
-        await self._search_options(search, mode)
+        try:
+            await asyncio.sleep(SEARCH_DEBOUNCE)
+            await self._search_options(search, mode)
+        finally:
+            if generation == self._search_generation:
+                controls = self._get_main_controls()
+                if controls is not None:
+                    controls[1].loading = False
 
     async def _search_options(self, search: str, mode: str) -> None:
         options = self.options
@@ -1151,7 +1222,9 @@ class MUSTApp(App[None]):
             if indices:
                 self._jump_to_index(option_list, indices[0])
         else:
-            option_list.set_options(self.visible_options([options[idx] for idx in indices]))
+            matches = [options[idx] for idx in indices]
+            self._current_matches = matches
+            option_list.set_options(self.visible_options(matches))
 
     def _jump_to_index(self, option_list: OptionList, idx: int) -> None:
         """Highlight option `idx`, showing a window of the sorted list around it instead of the whole list."""

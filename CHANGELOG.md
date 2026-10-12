@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Ctrl+Z` maximizes the plot and its controls (Clear Plot, Plot: TUI/Matplotlib, Data Range, the time range fields), hiding the header, footer, search box, parameter list and info panels; press again to restore. Unlike the single-letter shortcuts, it works even while the search box has focus.
 - A spinner now covers the plot while fetching data for a selection or a time range change, so it's clear the app is working rather than stuck — this can take a while for a parameter with many samples in the selected range.
 - The Parameter Metadata panel shows `plotted-samples`, the number of data points fetched for the current plot.
+- When the parameter list has more than 500 matches, its truncation hint is now selectable: pressing Enter on it (or clicking it) loads every match instead of only the first 500.
+- A spinner now covers the parameter list while a search is in progress, so it's clear the app is working rather than stuck — without it, the debounce plus the regex/fuzzy match itself (small but not instant) could look like typing had no effect.
 
 ### Changed
 
@@ -23,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fetching paginated parameter data reuses one connection for every page of a fetch, instead of opening a new one (a fresh TCP+TLS handshake) per page. This had made a multi-page fetch considerably slower than the single unpaginated request it replaced.
 - The Matplotlib plot's title no longer shows raw ANSI color codes (e.g. after switching to that backend, or after a time range change). It was picking up the TUI plot's title as-is, which is colored per parameter to make up for not having a real legend there — the Matplotlib window has a real legend and now gets the plain title.
 - The plot title now lists every currently plotted parameter (`Parameter: X` for one, `Parameters: X, Y, …` for several) instead of only the most recently selected one. This applies to both the TUI and Matplotlib plots. In the TUI plot, each name in the title is colored to match its trace — a real legend there can crash plotext (the terminal plotting library) in some situations, so this is used instead.
+- An anchored regex search (e.g. `^NC01_FRAME`) now matches the description shown in brackets in the parameter list. It previously could never match there: the label is `"MIBNAME [description]"`, so `^` on the combined label only ever matched at the MIB name's position, not the bracket's — the description is now its own, separately-anchorable search field.
 
 ## [0.4.0] - 2026-10-12
 

@@ -3,6 +3,10 @@
 The MUST TUI launches in a terminal and provides interactive access to telemetry parameters,
 their metadata, and time-series plots.
 
+Press `F1` at any time for an in-app help screen covering usage and the full list of keyboard
+shortcuts — the same reference as the [Global Key Bindings](#global-key-bindings) section below,
+generated from the app's own bindings so the two can't drift apart.
+
 ![MUSTApp TUI screenshot](images/mustapp-tui.png)
 
 ---
@@ -188,34 +192,36 @@ Metadata** panel's `plotted-samples` field shows the resulting point count once 
 single parameter's data in the selected range is extremely large (over 5,000,000 samples), a
 notification reports that only the first part of it was loaded.
 
-Use the **Clear Plot** button (or press `c`) to reset the plot.
+Use the **Clear Plot** button (or press `Ctrl+L`) to reset the plot.
 
 The plot marker style can be cycled through four options (Braille, Standard Definition, High
-Definition, Dot) with `m`.
+Definition, Dot) with `F3`.
 
 ---
 
 ## Global Key Bindings
 
-These bindings are available anywhere in the application:
+These bindings are available anywhere in the application. Every one of them is a `Ctrl`-combo or a
+function key — none are bare letters, so none are ever swallowed by the search box as typed text,
+regardless of where focus is:
 
 | Key | Action |
 |---|---|
+| `F1` | Open this help |
 | `Ctrl+Q` | Quit the application |
-| `Ctrl+L` (or `c`) | Clear all traces from the plot |
+| `Ctrl+L` | Clear all traces from the plot |
 | `Ctrl+Z` | Maximize the plot and its controls, hiding everything else; press again to restore |
 | `Ctrl+J` | Toggle between **Filter** and **Jump** search mode |
-| `p` | Toggle plot backend between TUI (built-in) and Matplotlib |
-| `r` | Soft-refresh the parameter cache (fetches from server, keeps SQLite cache) |
+| `F2` | Toggle plot backend between TUI (built-in) and Matplotlib |
+| `F3` | Cycle plot marker style (Braille → SD → HD → Dot) |
+| `F4` | Toggle light / dark mode |
+| `F5` | Soft-refresh the parameter cache (fetches from server, keeps SQLite cache) |
 | `Ctrl+R` | Hard-reset the parameter cache (wipes SQLite cache, then re-fetches) |
-| `d` | Toggle light / dark mode |
-| `m` | Cycle plot marker style (Braille → SD → HD → Dot) |
 
-Only the first three (`Ctrl+Q`, `Ctrl+L`, `Ctrl+Z`) are shown in the footer: they're the ones that
-work reliably regardless of where focus is. The rest still work as keys, but only while the search
-box does not have focus — a focused text field takes plain letters as typed input first — so they
-are left out of the footer instead of flickering in and out as focus moves around. `c` is a hidden
-alias for Clear Plot, kept for muscle memory; `Ctrl+L` is the one actually shown.
+Only the first four (`F1`, `Ctrl+Q`, `Ctrl+L`, `Ctrl+Z`) are shown in the footer, to keep it short;
+the rest still work exactly the same, they're just not advertised there. The full table — generated
+from the same bindings the app actually uses, so it can't go out of date — is always available by
+pressing `F1`.
 
 The status line above the footer shows the data provider, connection state, the number of
 parameters currently loaded, and how long ago the parameter cache was last refreshed.
@@ -239,7 +245,7 @@ If authentication fails the app offers the choice to **Abort** or continue in **
 
 After loading, the main screen is shown with the parameter list.  The parameter catalog is
 loaded from the local SQLite cache when available. A background refresh from the server runs at
-startup only when the cache is missing or older than one day; press `r` to refresh it at any time.
+startup only when the cache is missing or older than one day; press `F5` to refresh it at any time.
 
 ---
 
@@ -253,4 +259,4 @@ The built-in Textual plot renders directly in the terminal.  No graphical sessio
 
 Requires a graphical desktop session with a window manager.  When enabled, an external
 Matplotlib window opens alongside the terminal and stays in sync with the time range and
-parameter selections.  Switch back to the TUI backend with `p` or the **Plot: TUI** button.
+parameter selections.  Switch back to the TUI backend with `F2` or the **Plot: TUI** button.

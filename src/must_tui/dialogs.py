@@ -4,9 +4,11 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.containers import Vertical
+from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button
 from textual.widgets import Label
+from textual.widgets import Markdown
 
 
 class ErrorDialog(ModalScreen[bool]):
@@ -77,3 +79,23 @@ class WarningDialog(ModalScreen[bool]):
         if event.button.id == "btn-dialog-ok":
             self.dismiss(False)
             # self.app.query_one("#console-log", ConsoleOutput).write_log_info("You pressed OK...")
+
+
+class HelpDialog(ModalScreen[None]):
+    """Scrollable Markdown help/keyboard-shortcuts popup. Dismissed by the Close button or Escape."""
+
+    BINDINGS = [Binding("escape", "dismiss", "", show=False)]
+
+    def __init__(self, markdown: str) -> None:
+        super().__init__()
+        self._markdown = markdown
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            with VerticalScroll():
+                yield Markdown(self._markdown)
+            yield Button("Close", variant="primary", id="btn-dialog-close")
+
+    @on(Button.Pressed, "#btn-dialog-close")
+    def on_close_pressed(self) -> None:
+        self.dismiss(None)

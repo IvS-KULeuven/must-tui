@@ -170,3 +170,24 @@ WarningDialog > Vertical {
         }
     }
 }
+
+HelpDialog {
+    align: center middle;
+}
+
+HelpDialog > Vertical {
+    border: thick $primary 50%;
+    width: 80%;
+    height: 80%;
+    background: $boost;
+    padding: 1 2;
+
+    VerticalScroll {
+        height: 1fr;
+    }
+
+    #btn-dialog-close {
+        width: 100%;
+        margin-top: 1;
+    }
+}

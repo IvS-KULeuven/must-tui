@@ -7,6 +7,7 @@ from aiohttp import web
 import pytest
 
 import must_tui.must as must
+import must_tui.must_app as must_app
 from must_tui.matplotlib_bridge import MatplotlibPlotter
 from must_tui.must_app import downsample_min_max, parameter_data_range
 from must_tui.time_range_input import TimeRange
@@ -86,6 +87,75 @@ def test_matplotlib_batch_sends_state_once():
     assert plotter.labels == ["P1"]
 
 
+class _FakePopen:
+    def __init__(self, returncode=None):
+        self.returncode = returncode
+
+    def poll(self):
+        return self.returncode
+
+
+def test_matplotlib_plotter_is_running_reflects_the_process():
+    plotter = MatplotlibPlotter()
+    assert plotter.is_running() is False  # never started
+
+    plotter._process = _FakePopen(returncode=None)
+    assert plotter.is_running() is True  # still alive
+
+    plotter._process = _FakePopen(returncode=0)
+    assert plotter.is_running() is False  # exited (e.g. window closed by the user)
+
+
+class _FakeMatplotlibPlotter:
+    def __init__(self, running):
+        self._running = running
+        self.closed = False
+
+    def is_running(self):
+        return self._running
+
+    def close(self):
+        self.closed = True
+        self._running = False
+
+
+def _app_with_matplotlib_backend(running, plot_backend="matplotlib"):
+    app = must_app.MUSTApp()
+    app.plot_backend = plot_backend
+    app.matplotlib_plotter = _FakeMatplotlibPlotter(running)
+    app.notifications = []
+    app.notify = lambda message, **kwargs: app.notifications.append(message)
+    return app
+
+
+def test_check_matplotlib_window_reverts_when_the_window_was_closed():
+    app = _app_with_matplotlib_backend(running=False)
+
+    app._check_matplotlib_window()
+
+    assert app.plot_backend == "textual"
+    assert app.matplotlib_plotter.closed is True
+    assert app.notifications and "closed" in app.notifications[0]
+
+
+def test_check_matplotlib_window_does_nothing_while_the_window_is_open():
+    app = _app_with_matplotlib_backend(running=True)
+
+    app._check_matplotlib_window()
+
+    assert app.plot_backend == "matplotlib"
+    assert app.notifications == []
+
+
+def test_check_matplotlib_window_does_nothing_on_the_tui_backend():
+    app = _app_with_matplotlib_backend(running=False, plot_backend="textual")
+
+    app._check_matplotlib_window()
+
+    assert app.plot_backend == "textual"
+    assert app.notifications == []
+
+
 def test_must_request_returns_none_on_timeout(monkeypatch):
     monkeypatch.setattr(must, "REQUEST_TIMEOUT", aiohttp.ClientTimeout(total=None, sock_connect=0.2, sock_read=0.2))
 
@@ -147,8 +217,6 @@ def test_must_request_allows_slow_but_steady_transfer(monkeypatch):
 
 
 def _app_with_range(start, end):
-    import must_tui.must_app as must_app
-
     app = must_app.MUSTApp()
     app.time_range = must_app.TimeRange(start=dt.datetime(*start), end=dt.datetime(*end))
     app.warnings = []
@@ -157,8 +225,6 @@ def _app_with_range(start, end):
 
 
 def test_plot_parameter_refuses_start_after_end(monkeypatch):
-    import must_tui.must_app as must_app
-
     app = _app_with_range((2026, 10, 9, 18), (2025, 12, 5))
     fetched = []
 

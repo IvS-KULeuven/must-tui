@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-12
+
 ### Added
 
 - `Ctrl+Z` maximizes the plot and its controls (Clear Plot, Plot: TUI/Matplotlib, Data Range, the time range fields), hiding the header, footer, search box, parameter list and info panels; press again to restore.

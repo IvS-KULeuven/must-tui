@@ -14,8 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Parameter Metadata panel shows `plotted-samples`, the number of data points fetched for the current plot.
 - When the parameter list has more than 500 matches, its truncation hint is now selectable: pressing Enter on it (or clicking it) loads every match instead of only the first 500.
 - A spinner now covers the parameter list while a search is in progress, so it's clear the app is working rather than stuck — without it, the debounce plus the regex/fuzzy match itself (small but not instant) could look like typing had no effect.
+- A status line above the footer shows the data provider, connection state, the number of parameters currently loaded, and how long ago the parameter cache was last refreshed.
 
 ### Changed
+
+- The footer now only advertises `Ctrl+Q`, `Ctrl+L` (Clear Plot) and `Ctrl+Z` (Maximize plot) — the bindings that work reliably regardless of focus. The single-letter bindings (`p`, `r`, `d`, `m`) and `Ctrl+J`/`Ctrl+R` still work exactly as before, but are no longer shown in the footer, where they used to appear and disappear depending on whether the search box had focus. `c` still clears the plot too, as a hidden alias for `Ctrl+L`.
 
 - Fetching parameter data for the TUI (both selecting a parameter and reloading on a time range change) now uses MUST link's paginated endpoint (5000 samples per request) instead of one unpaginated request for the whole range, matching how the REPL helper (`get_parameter_series_async`) already worked. The paginated endpoint is the one MUST link's REST API documents `limit`/`cursor` on; the plain endpoint has no such parameter, so it no longer receives a (previously meaningless) `limit=1000`.
 - The internal safety limit on how many pages a paginated fetch follows is raised from 20 (20,000 samples) to 1000 (5,000,000 samples at the new page size), and reaching it now shows a warning naming the affected parameter(s) and the sample count actually loaded, instead of silently returning incomplete data.

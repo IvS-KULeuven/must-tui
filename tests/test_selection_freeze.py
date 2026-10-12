@@ -4,9 +4,12 @@ import datetime as dt
 import aiohttp
 from aiohttp import web
 
+import pytest
+
 import must_tui.must as must
 from must_tui.matplotlib_bridge import MatplotlibPlotter
-from must_tui.must_app import downsample_min_max
+from must_tui.must_app import downsample_min_max, parameter_data_range
+from must_tui.time_range_input import TimeRange
 
 
 def _series(count):
@@ -34,6 +37,25 @@ def test_downsample_limits_points_and_keeps_spikes_in_time_order():
     assert max(ds_values) == 1e6
     assert min(ds_values) == -1e6
     assert ds_time == sorted(ds_time)
+
+
+def test_parameter_data_range_uses_first_and_last_sample():
+    metadata = {"first-sample": "2024-01-01 00:00:00", "last-sample": "2024-06-01 12:00:00", "name": "PAR_X"}
+
+    assert parameter_data_range(metadata) == TimeRange(dt.datetime(2024, 1, 1), dt.datetime(2024, 6, 1, 12))
+
+
+@pytest.mark.parametrize("metadata", [{}, {"first-sample": "2024-01-01 00:00:00"}, {"last-sample": None}])
+def test_parameter_data_range_rejects_missing_samples(metadata):
+    with pytest.raises(ValueError, match="Select a parameter"):
+        parameter_data_range(metadata)
+
+
+def test_parameter_data_range_rejects_first_not_before_last():
+    metadata = {"first-sample": "2024-06-01 00:00:00", "last-sample": "2024-01-01 00:00:00"}
+
+    with pytest.raises(ValueError, match="is not before its last sample"):
+        parameter_data_range(metadata)
 
 
 class _CountingPipe:

@@ -25,7 +25,7 @@ from must_tui.dialogs import ErrorDialog, WarningDialog
 from must_tui.matplotlib_bridge import MatplotlibPlotter, can_open_matplotlib_window
 from must_tui.mib import read_pcf
 from must_tui.parameter_cache import get_parameter_cache_updated_at
-from must_tui.time_range_input import TimeRange, TimeRangeInput, format_datetime
+from must_tui.time_range_input import TimeRange, TimeRangeInput, format_datetime, parse_datetime
 
 # from textual_plot import HiResMode, PlotWidget
 # from egse.system import title_to_kebab
@@ -127,6 +127,25 @@ class ParameterSelected(Message):
     def __init__(self, parameter_name: str) -> None:
         super().__init__()
         self.parameter_name = parameter_name
+
+
+def parameter_data_range(metadata: dict) -> TimeRange:
+    """The `TimeRange` spanning a parameter's `first-sample`/`last-sample`, as reported by MUST's metadata.
+
+    Raises:
+        ValueError: with a message that can be shown to the user, when the metadata has no (valid) sample range.
+    """
+
+    first_sample, last_sample = metadata.get("first-sample"), metadata.get("last-sample")
+    if not isinstance(first_sample, str) or not isinstance(last_sample, str):
+        raise ValueError("Select a parameter with data on MUST first.")
+
+    new_range = TimeRange(parse_datetime(first_sample), parse_datetime(last_sample))
+    if not new_range.is_valid():
+        raise ValueError(
+            f"The parameter's first sample ({first_sample}) is not before its last sample ({last_sample})."
+        )
+    return new_range
 
 
 def downsample_min_max(
@@ -273,6 +292,10 @@ class ParameterInfo(Static):
             self.table.add_row(field, str(value), key=field)
 
 
+PLOT_DATE_FORM = "Y-m-d H:M:S"
+"""plotext date format matching `format_datetime()`, for `Plot.date_form()` / `Plot.xlim()`."""
+
+
 class TimeRangePlotter(PlotWidget, can_focus=True):
     """Widget to plot parameter data over a specified time range."""
 
@@ -290,6 +313,9 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         """Downsampled copies of the series, with formatted timestamps, as drawn by plotext."""
         self.xlimits: tuple[datetime.datetime, datetime.datetime] | None = None
         self.ylimits: tuple[float, float] | None = None
+        # plotext defaults to "%d/%m/%Y" until date_form() is called; set it now so the first-ever
+        # set_xlimits() (before any replot() has run) doesn't crash on our "YYYY-MM-DD HH:MM:SS" strings.
+        self.plt.date_form(PLOT_DATE_FORM)
 
     def set_context(self, must_ctx: MustContext) -> None:
         self.must_ctx = must_ctx
@@ -342,7 +368,7 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         # self.plt.clear_data()
         plotter = cast(Any, self.plt)
         plotter.clear_figure()  # not sure yet what the difference is with clf() or cld()
-        plotter.date_form("Y-m-d H:M:S")
+        plotter.date_form(PLOT_DATE_FORM)  # clear_figure() also resets the date form
         if self.xlimits is not None:
             # clear_figure() also clears the limits; keep showing the selected time range.
             start, end = self.xlimits
@@ -417,6 +443,11 @@ class MainScreen(Screen[None]):
                 with Horizontal(id="plot-controls"):
                     yield Button("Clear Plot", id="bt-plot-clear")
                     yield Button("Plot: TUI", id="bt-plot-backend")
+                    yield Button(
+                        "Data Range",
+                        id="bt-time-range-data",
+                        tooltip="Set the time range to the selected parameter's first and last sample on MUST.",
+                    )
                     yield TimeRangeInput(app.time_range.start, app.time_range.end, id="time-range")
                 yield app.plot_widget
         yield Footer()
@@ -670,12 +701,38 @@ class MUSTApp(App[None]):
         """
 
         log.info(f"Time range changed to {event.time_range}")
-        self.time_range = event.time_range
-        start, end = self.time_range.start, self.time_range.end
+        self._apply_time_range(event.time_range)
+
+    def _apply_time_range(self, time_range: TimeRange) -> None:
+        """Move the x-axis to `time_range` and fetch the plotted parameters again for it."""
+
+        self.time_range = time_range
+        start, end = time_range.start, time_range.end
         self.plot_widget.set_xlimits(start, end)
         if self.plot_backend == "matplotlib":
             self.matplotlib_plotter.set_xlimits(start, end)
         self.reload_plotted_parameters()
+
+    @on(Button.Pressed, "#bt-time-range-data")
+    def use_parameter_data_range(self, event: Button.Pressed) -> None:
+        """Set the time range to the selected parameter's first and last sample, as reported by MUST."""
+
+        event.stop()
+        try:
+            metadata = self.screen.query_one(ParameterMetadata).metadata
+            time_range_input = self.screen.query_one(TimeRangeInput)
+        except NoMatches:
+            return
+
+        try:
+            new_range = parameter_data_range(metadata)
+        except ValueError as exc:
+            self.notify(str(exc), title="Time range not changed", severity="warning")
+            return
+
+        time_range_input.set_time_range(new_range)
+        if new_range != self.time_range:
+            self._apply_time_range(new_range)
 
     @work(exclusive=True, group="reload", exit_on_error=False)
     async def reload_plotted_parameters(self) -> None:

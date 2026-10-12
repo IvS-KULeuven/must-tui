@@ -20,10 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An invalid regular expression in the search box now keeps the current list instead of emptying it.
 - The date-time range picker (`textual-timepiece`) is replaced by two plain start/end fields and a **Lock** checkbox. Type `YYYY-MM-DD`, `YYYY-MM-DD HH:MM`, `YYYY-MM-DD HH:MM:SS` or `now`; a field is applied when you press Enter or leave it. Invalid dates and a start that is not before the end are marked in red, explained in a notification, and leave the range unchanged. **Lock** keeps the duration fixed when one end is changed. This removes the old picker's problems: months 03–09 could not be typed, Backspace on the month edited the year, impossible dates such as 2025-11-31 were silently ignored, and every keystroke that formed a valid date already changed the range.
 - Changing the time range now fetches the plotted parameters again for the new range (previously only the x-axis moved, leaving parts of the range without data). Notifications report the reload and any parameter without data in the new range, which is removed from the plot.
+- `Escape` leaves a focused time range field, committing a pending valid edit first, like pressing `Tab` does.
+- A **Data Range** button sets the time range to the selected parameter's first and last sample, as reported by MUST.
 
 ### Fixed
 
 - The terminal plot keeps showing the selected time range on its x-axis. Every redraw (a new trace, a marker change) used to reset the axis to the span of the data.
+- Plotting the first parameter of a session no longer fails with `Date Form should be: %d/%m/%Y`. plotext's date format was only set when redrawing an existing plot, so the very first `set_xlimits()` call crashed (caught and shown as a warning dialog).
 - MUST link requests now time out when connecting or waiting for data takes longer than 30 seconds (previously aiohttp's default of 5 minutes in total, during which the TUI appeared to hang). There is no limit on the total duration, so large transfers still complete. This applies to the REPL helpers too. In the TUI, a request that gets no response is reported in a warning dialog instead of failing silently.
 - A login or request timeout is now handled and logged instead of raising an uncaught `TimeoutError`.
 - The Parameter Format Code from the PCF is now stored under the key `pfc` (was `pcf`), so the TUI's ParameterInfo panel shows its value instead of `N/A`. In `search_parameters()` results the field is now `pcf_pfc` (was `pcf_pcf`).

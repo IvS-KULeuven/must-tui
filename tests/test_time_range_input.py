@@ -4,9 +4,11 @@ import datetime as dt
 import pytest
 from textual import on
 from textual.app import App
-from textual.widgets import Checkbox, Input
+from textual.screen import Screen
+from textual.widgets import Button, Checkbox, Input
 
 import must_tui.must_app as must_app
+from must_tui.must_app import ParameterMetadata
 from must_tui.time_range_input import TimeRange, TimeRangeInput, parse_datetime
 
 START = dt.datetime(2025, 12, 2)
@@ -143,6 +145,28 @@ def test_confirming_an_unchanged_value_sends_nothing():
     _run(test)
 
 
+def test_escape_defocuses_the_field():
+    async def test(app, pilot):
+        field = app.query_one("#time-range-start", Input)
+        field.focus()
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+        assert app.screen.focused is None
+
+    _run(test)
+
+
+def test_escape_commits_a_pending_valid_edit_like_a_blur():
+    async def test(app, pilot):
+        field, before_escape = await _type_into(pilot, "#time-range-start", "2025-10-01", confirm="escape")
+        assert before_escape == []
+        assert app.changes == [TimeRange(dt.datetime(2025, 10, 1), END)]
+        assert app.screen.focused is None
+
+    _run(test)
+
+
 def test_set_time_range_from_code_sends_nothing():
     async def test(app, pilot):
         widget = app.query_one(TimeRangeInput)
@@ -253,3 +277,68 @@ def test_reload_respects_clear_and_selection_during_the_fetch(monkeypatch):
     # A was cleared by the user while it was being fetched, C was selected meanwhile
     assert app.plot_widget.labels == ["C"]
     assert app.plot_widget.data == [[9.0]]
+
+
+class _FakeMainScreen(Screen):
+    """A stand-in for MainScreen with just the widgets `use_parameter_data_range` needs."""
+
+    def compose(self):
+        yield ParameterMetadata()
+        yield Button("Data Range", id="bt-time-range-data")
+        yield TimeRangeInput(START, END, id="time-range")
+
+
+def _app_for_data_range_button(monkeypatch):
+    async def fake_initialize(self):
+        self.install_screen(_FakeMainScreen(), name="main")
+        self.push_screen("main")
+        self.time_range = TimeRange(START, END)
+
+    monkeypatch.setattr(must_app.MUSTApp, "_initialize_and_show_main_screen", fake_initialize)
+    return must_app.MUSTApp()
+
+
+async def _run_data_range_button(app, metadata=None):
+    async with app.run_test(size=(120, 20)) as pilot:
+        while not isinstance(app.screen, _FakeMainScreen):
+            await pilot.pause(0.05)
+        notifications = []
+        app.notify = lambda message, **kwargs: notifications.append((message, kwargs))
+        if metadata is not None:
+            await app.screen.query_one(ParameterMetadata).update_metadata("PAR_X", metadata)
+        app.screen.query_one("#bt-time-range-data", Button).press()
+        await pilot.pause()
+        start_field_value = app.screen.query_one("#time-range-start", Input).value
+        return notifications, start_field_value
+
+
+def test_data_range_button_uses_the_parameters_first_and_last_sample(monkeypatch):
+    app = _app_for_data_range_button(monkeypatch)
+    metadata = {"first-sample": "2024-01-01 00:00:00", "last-sample": "2024-06-01 12:00:00"}
+
+    notifications, start_field_value = asyncio.run(_run_data_range_button(app, metadata))
+
+    assert notifications == []
+    assert app.time_range == TimeRange(dt.datetime(2024, 1, 1), dt.datetime(2024, 6, 1, 12))
+    assert start_field_value == "2024-01-01 00:00:00"
+    # regression guard: set_xlimits() must not crash plotext on the very first-ever call (before any replot())
+    assert app.plot_widget.xlimits == (dt.datetime(2024, 1, 1), dt.datetime(2024, 6, 1, 12))
+
+
+def test_data_range_button_without_a_selected_parameter_warns_and_keeps_the_range(monkeypatch):
+    app = _app_for_data_range_button(monkeypatch)
+
+    notifications, _ = asyncio.run(_run_data_range_button(app))
+
+    assert app.time_range == TimeRange(START, END)
+    assert notifications and "Select a parameter" in notifications[0][0]
+
+
+def test_data_range_button_rejects_first_sample_not_before_last_sample(monkeypatch):
+    app = _app_for_data_range_button(monkeypatch)
+    metadata = {"first-sample": "2024-06-01 00:00:00", "last-sample": "2024-01-01 00:00:00"}
+
+    notifications, _ = asyncio.run(_run_data_range_button(app, metadata))
+
+    assert app.time_range == TimeRange(START, END)
+    assert notifications and "is not before its last sample" in notifications[0][0]

@@ -13,6 +13,7 @@ from typing import ClassVar
 
 from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.message import Message
 from textual.widgets import Checkbox, Input, Label
@@ -69,6 +70,8 @@ class TimeRangeInput(Horizontal):
     Posts `TimeRangeInput.Changed` once per accepted change (Enter or leaving a field). Invalid input is marked in
     red, explained in a notification, and leaves the current range unchanged.
     """
+
+    BINDINGS: ClassVar[list[Binding]] = [Binding("escape", "defocus", "Defocus", show=False)]
 
     DEFAULT_CSS: ClassVar[str] = """
     TimeRangeInput {
@@ -128,6 +131,12 @@ class TimeRangeInput(Horizontal):
     @property
     def locked(self) -> bool:
         return self.query_one("#time-range-lock", Checkbox).value
+
+    def action_defocus(self) -> None:
+        """Leave the focused field (Escape), committing it like Tabbing away would."""
+
+        if self.screen.focused in self.query("Input, Checkbox"):
+            self.screen.set_focus(None)
 
     @on(Input.Changed)
     def _editing(self, event: Input.Changed) -> None:

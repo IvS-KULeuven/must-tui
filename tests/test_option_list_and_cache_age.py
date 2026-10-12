@@ -2,6 +2,7 @@ import datetime as dt
 
 import must_tui.must_app as must_app
 from must_tui.must_app import MAX_VISIBLE_OPTIONS
+from must_tui.must_app import SHOW_ALL_MATCHES_ID
 from must_tui.must_app import MUSTApp
 from must_tui.parameter_cache import get_parameter_cache_updated_at
 from must_tui.parameter_cache import store_parameter_cache_rows
@@ -13,14 +14,15 @@ def test_visible_options_returns_all_matches_below_the_cap():
     assert MUSTApp.visible_options(matches) == matches
 
 
-def test_visible_options_caps_matches_and_adds_disabled_hint():
+def test_visible_options_caps_matches_and_adds_a_selectable_show_all_hint():
     matches = [f"P{i}" for i in range(MAX_VISIBLE_OPTIONS + 42)]
 
     visible = MUSTApp.visible_options(matches)
 
     assert visible[:-1] == matches[:MAX_VISIBLE_OPTIONS]
     hint = visible[-1]
-    assert hint.disabled
+    assert not hint.disabled
+    assert hint.id == SHOW_ALL_MATCHES_ID
     assert "42 more matches" in str(hint.prompt)
 
 

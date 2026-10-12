@@ -191,3 +191,50 @@ HelpDialog > Vertical {
         margin-top: 1;
     }
 }
+
+YAxisRangeDialog {
+    align: center middle;
+}
+
+YAxisRangeDialog > Vertical {
+    border: thick $primary 50%;
+    width: 70%;
+    min-width: 66;
+    height: auto;
+    background: $boost;
+    padding: 1 2;
+
+    Label {
+        text-style: bold;
+        margin-bottom: 1;
+    }
+
+    Horizontal {
+        height: 3;
+        align: left middle;
+
+        Label {
+            width: 6;
+            text-style: none;
+            margin-bottom: 0;
+        }
+
+        Input {
+            width: 1fr;
+        }
+    }
+
+    #lbl-y-range-error {
+        color: $error;
+        text-style: none;
+        height: 1;
+    }
+
+    Horizontal:last-of-type {
+        height: 3;
+        align: center middle;
+        Button {
+            margin: 0 1;
+        }
+    }
+}

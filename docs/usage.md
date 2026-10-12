@@ -139,8 +139,16 @@ A toolbar between the info panels and the plot area:
 | **Clear Plot** button | Remove all plotted traces |
 | **Plot: TUI / Plot: Matplotlib** button | Toggle between the built-in TUI plot and an external Matplotlib window |
 | **Data Range** button | Set the time range to the selected parameter's first and last sample, as reported by MUST |
+| **Y Range** button | Set an explicit Y-axis minimum and maximum, or go back to auto-scaling |
 | **Start → End** fields | Set the start and end time for data retrieval and the plot x-axis |
 | **Lock** checkbox | Keep the duration fixed: changing one end moves the other end along |
+
+By default the Y-axis auto-scales to fit whatever is currently plotted. The **Y Range** button opens
+a small dialog with **Min** and **Max** fields (pre-filled with the currently plotted data's range,
+or the active locked range if one is set) and three actions: **Apply** (validates that Min is less
+than Max), **Auto** (clears the locked range immediately), and **Cancel**. Once a range is locked,
+it stays in effect — across new parameter selections, time range reloads, and clearing the plot —
+until you choose **Auto** again, for both the TUI and Matplotlib backends.
 
 Type a date-time as `YYYY-MM-DD HH:MM:SS`. Shorter forms are accepted too: `YYYY-MM-DD HH:MM`
 (seconds 0) and `YYYY-MM-DD` (midnight). A field is applied when you press **Enter** or leave it

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -7,6 +7,7 @@ from textual.containers import Vertical
 from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button
+from textual.widgets import Input
 from textual.widgets import Label
 from textual.widgets import Markdown
 
@@ -98,4 +99,61 @@ class HelpDialog(ModalScreen[None]):
 
     @on(Button.Pressed, "#btn-dialog-close")
     def on_close_pressed(self) -> None:
+        self.dismiss(None)
+
+
+YAxisRangeResult = Union[tuple, str, None]
+"""The dialog's result: an explicit `(ymin, ymax)`, the string `"auto"`, or `None` for cancelled."""
+
+
+class YAxisRangeDialog(ModalScreen[YAxisRangeResult]):
+    """Prompts for an explicit Y-axis range, or to go back to auto-scaling. Escape cancels (result `None`)."""
+
+    BINDINGS = [Binding("escape", "dismiss(None)", "", show=False)]
+
+    def __init__(self, default_range: Optional[tuple] = None) -> None:
+        super().__init__()
+        self._default_min = "" if default_range is None else str(default_range[0])
+        self._default_max = "" if default_range is None else str(default_range[1])
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label("Y-Axis Range")
+            with Horizontal():
+                yield Label("Min:")
+                yield Input(self._default_min, id="inp-y-min")
+            with Horizontal():
+                yield Label("Max:")
+                yield Input(self._default_max, id="inp-y-max")
+            yield Label("", id="lbl-y-range-error")
+            with Horizontal():
+                yield Button("Apply", variant="primary", id="btn-dialog-apply")
+                yield Button("Auto", id="btn-dialog-auto")
+                yield Button("Cancel", id="btn-dialog-cancel")
+
+    @on(Button.Pressed, "#btn-dialog-apply")
+    def on_apply_pressed(self) -> None:
+        min_input = self.query_one("#inp-y-min", Input)
+        max_input = self.query_one("#inp-y-max", Input)
+        error_label = self.query_one("#lbl-y-range-error", Label)
+
+        try:
+            ymin = float(min_input.value)
+            ymax = float(max_input.value)
+        except ValueError:
+            error_label.update("Enter a numeric value for both Min and Max.")
+            return
+
+        if not ymin < ymax:
+            error_label.update("Min must be less than Max.")
+            return
+
+        self.dismiss((ymin, ymax))
+
+    @on(Button.Pressed, "#btn-dialog-auto")
+    def on_auto_pressed(self) -> None:
+        self.dismiss("auto")
+
+    @on(Button.Pressed, "#btn-dialog-cancel")
+    def on_cancel_pressed(self) -> None:
         self.dismiss(None)

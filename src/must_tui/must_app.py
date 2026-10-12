@@ -26,7 +26,7 @@ from rapidfuzz import fuzz as rf_fuzz, process
 # raises TypeError.
 import plotext
 
-from must_tui.dialogs import ErrorDialog, HelpDialog, WarningDialog
+from must_tui.dialogs import ErrorDialog, HelpDialog, WarningDialog, YAxisRangeDialog
 from must_tui.matplotlib_bridge import MatplotlibPlotter, can_open_matplotlib_window
 from must_tui.mib import read_pcf
 from must_tui.parameter_cache import get_parameter_cache_updated_at
@@ -467,6 +467,14 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         plotter.ylim(ymin, ymax)
         self.refresh()
 
+    def reset_ylimits(self) -> None:
+        """Go back to auto-scaling the Y-axis to fit whatever is currently plotted."""
+
+        self.ylimits = None
+        plotter = cast(Any, self.plt)
+        plotter.ylim()  # no args: plotext's own reset to auto, confirmed empirically (see dev notes)
+        self.refresh()
+
     async def update(
         self, par_name: str, timestamps: list[datetime.datetime], values: list[float], time_range: TimeRange
     ) -> None:
@@ -494,6 +502,12 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
             # clear_figure() also clears the limits; keep showing the selected time range.
             start, end = self.xlimits
             plotter.xlim(start.strftime("%Y-%m-%d %H:%M:%S"), end.strftime("%Y-%m-%d %H:%M:%S"))
+        if self.ylimits is not None:
+            # A user-locked Y range (see MUSTApp.manual_ylimits) must survive clear_figure() the same way
+            # xlimits does, or it would silently revert to auto-scaling on the next plotted parameter/marker
+            # change/time range reload. When None (the common case), the Y-axis is left to plotext's own
+            # auto-scaling -- don't recompute a per-parameter range here, it would clip other plotted series.
+            plotter.ylim(*self.ylimits)
         plotter.title(self.title)
         # self.plt.xlabel("Date-Time")  # takes too much real estate
         # self.plt.ylabel("Value")  # will be put in the same space as the x-label
@@ -579,6 +593,11 @@ class MainScreen(Screen[None]):
                         id="bt-time-range-data",
                         tooltip="Set the time range to the selected parameter's first and last sample on MUST.",
                     )
+                    yield Button(
+                        "Y Range",
+                        id="bt-y-range",
+                        tooltip="Set an explicit Y-axis range, or go back to auto-scaling.",
+                    )
                     yield TimeRangeInput(app.time_range.start, app.time_range.end, id="time-range")
                 yield app.plot_widget
         yield Static(id="status-bar")
@@ -642,6 +661,8 @@ class MUSTApp(App[None]):
         self.matplotlib_plotter = MatplotlibPlotter()
         self.plot_backend = "textual"
         self.time_range = TimeRange(start=datetime.datetime(2025, 12, 2), end=datetime.datetime(2025, 12, 5))
+        self.manual_ylimits: tuple[float, float] | None = None
+        """User-locked Y-axis range (via the Y Range dialog); None means both plot backends auto-scale."""
 
     async def on_mount(self) -> None:
         self.install_screen(LoadingScreen(), name="loading")
@@ -935,6 +956,45 @@ class MUSTApp(App[None]):
         if new_range != self.time_range:
             self._apply_time_range(new_range)
 
+    def _apply_ylimits(self, plotter: Any) -> None:
+        """Apply the user-locked Y range to `plotter`, if one is set; otherwise leave it to auto-scale."""
+
+        if self.manual_ylimits is not None:
+            plotter.set_ylimits(*self.manual_ylimits)
+
+    @on(Button.Pressed, "#bt-y-range")
+    def show_y_range_dialog(self, event: Button.Pressed) -> None:
+        event.stop()
+        self.open_y_range_dialog()
+
+    @work()
+    async def open_y_range_dialog(self) -> None:
+        """Prompt for an explicit Y-axis range, or to go back to auto-scaling."""
+
+        if not self._main_screen_active():
+            return
+
+        default_range = self.manual_ylimits
+        if default_range is None:
+            values = [value for series in self.plot_widget.data for value in series]
+            if values:
+                default_range = (min(values), max(values))
+
+        result = await self.push_screen_wait(YAxisRangeDialog(default_range))
+        if result is None:
+            return
+
+        if result == "auto":
+            self.manual_ylimits = None
+            self.plot_widget.reset_ylimits()
+            if self.plot_backend == "matplotlib":
+                self.matplotlib_plotter.reset_ylimits()
+        else:
+            self.manual_ylimits = result
+            self.plot_widget.set_ylimits(*result)
+            if self.plot_backend == "matplotlib":
+                self.matplotlib_plotter.set_ylimits(*result)
+
     @work(exclusive=True, group="reload", exit_on_error=False)
     async def reload_plotted_parameters(self) -> None:
         """Fetch the plotted parameters again for the current time range and replace their series.
@@ -982,9 +1042,7 @@ class MUSTApp(App[None]):
         self.plot_widget.clear_plot()
         if series:
             self.plot_widget.set_xlimits(time_range.start, time_range.end)
-            self.plot_widget.set_ylimits(
-                min(min(v) for _, _, v in series) - 1.0, max(max(v) for _, _, v in series) + 1.0
-            )
+            self._apply_ylimits(self.plot_widget)
             for name, timestamps, values in series:
                 await self.plot_widget.update(name, timestamps, values, time_range)
         if self.plot_backend == "matplotlib":
@@ -1124,13 +1182,13 @@ class MUSTApp(App[None]):
             )
 
         self.plot_widget.set_xlimits(self.time_range.start, self.time_range.end)
-        self.plot_widget.set_ylimits(min(values) - 1.0, max(values) + 1.0)
+        self._apply_ylimits(self.plot_widget)
         await self.plot_widget.update(par_name, timestamps, values, self.time_range)
 
         if self.plot_backend == "matplotlib":
             with self.matplotlib_plotter.batch():
                 self.matplotlib_plotter.set_xlimits(self.time_range.start, self.time_range.end)
-                self.matplotlib_plotter.set_ylimits(min(values) - 1.0, max(values) + 1.0)
+                self._apply_ylimits(self.matplotlib_plotter)
                 await self.matplotlib_plotter.update(par_name, timestamps, values, self.time_range)
 
     def _show_sample_count(self, par_name: str, count: int | None) -> None:

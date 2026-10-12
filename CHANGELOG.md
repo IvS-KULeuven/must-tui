@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-12
+
 ### Changed
 
 - The parameter list shows at most 500 entries, with a final entry saying how many more matches were left out. Refilling the list with all ~70,000 parameters took seconds on startup, on clearing the search, and on broad searches such as a single letter.

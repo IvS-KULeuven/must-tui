@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MUST link requests now time out when connecting or waiting for data takes longer than 30 seconds (previously aiohttp's default of 5 minutes in total, during which the TUI appeared to hang). There is no limit on the total duration, so large transfers still complete. This applies to the REPL helpers too. In the TUI, a request that gets no response is reported in a warning dialog instead of failing silently.
 - A login or request timeout is now handled and logged instead of raising an uncaught `TimeoutError`.
 - The Parameter Format Code from the PCF is now stored under the key `pfc` (was `pcf`), so the TUI's ParameterInfo panel shows its value instead of `N/A`. In `search_parameters()` results the field is now `pcf_pfc` (was `pcf_pcf`).
+- The Clear Plot, Plot: TUI/Matplotlib and Data Range buttons no longer reverse-highlight their label text when focused (Textual's default style). The whole button now gets the already-present subtle background tint instead.
+- Closing the Matplotlib plot window now reverts the app to the TUI plot and updates the button label, instead of leaving the app thinking the Matplotlib backend is still active. Checked twice a second while that backend is selected.
 
 ## [0.3.7] - 2026-06-30
 

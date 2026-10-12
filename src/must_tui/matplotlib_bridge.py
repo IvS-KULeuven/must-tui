@@ -62,6 +62,11 @@ class MatplotlibPlotter:
         self.title = title
         self._send_state()
 
+    def is_running(self) -> bool:
+        """Whether the Matplotlib window process is still alive (False once the user closes the window)."""
+
+        return self._process is not None and self._process.poll() is None
+
     def start(self) -> None:
         if self._process is not None and self._process.poll() is None:
             return

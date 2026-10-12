@@ -502,6 +502,7 @@ class MUSTApp(App[None]):
         self.install_screen(LoadingScreen(), name="loading")
         self.push_screen("loading")
         asyncio.create_task(self._initialize_and_show_main_screen())
+        self.set_interval(0.5, self._check_matplotlib_window)
 
     def _set_loading_status(self, message: str) -> None:
         if isinstance(self.screen, LoadingScreen):
@@ -651,7 +652,9 @@ class MUSTApp(App[None]):
         return can_open_matplotlib_window()
 
     def _update_plot_backend_button(self) -> None:
-        if not self.is_mounted or not self._main_screen_active():
+        # `self.screen` raises if no screen was ever pushed yet; `self.is_mounted` is a method (always truthy),
+        # not the property this guard needs, so check the screen stack directly instead.
+        if not self.screen_stack or not self._main_screen_active():
             return
 
         try:
@@ -677,6 +680,13 @@ class MUSTApp(App[None]):
         self.plot_backend = "textual"
         self.matplotlib_plotter.close()
         self._update_plot_backend_button()
+
+    def _check_matplotlib_window(self) -> None:
+        """Revert to the TUI plot when the Matplotlib window was closed by the user, outside the app."""
+
+        if self.plot_backend == "matplotlib" and not self.matplotlib_plotter.is_running():
+            self._disable_matplotlib_backend()
+            self.notify("The Matplotlib window was closed; showing the TUI plot.", title="Plot backend")
 
     @work()
     async def show_error_dialog(self, error_message: str) -> None:

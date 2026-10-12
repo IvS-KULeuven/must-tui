@@ -59,6 +59,12 @@ OptionList {
     height: 3;
 }
 
+/* Textual's default Button style reverses the label text on focus (which a click leaves behind); show the
+   already-present subtle background tint instead of reversing the text. */
+#plot-controls Button:focus {
+    text-style: bold;
+}
+
 #bt-plot-clear {
 /*    border: solid red; */
 }

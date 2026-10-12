@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 import asyncio
 from collections.abc import Callable, Coroutine
 from concurrent.futures import ThreadPoolExecutor
+import contextlib
 import datetime
 import importlib.resources
 import json
@@ -25,6 +26,21 @@ REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=3
 
 There is no limit on the total duration, so large but healthy transfers still complete. aiohttp's default
 (5 minutes total) made the TUI look hung when the server stalled.
+"""
+
+PAGE_SIZE = 5000
+"""Samples requested per page from the paginated parameter data endpoint (its `limit` parameter).
+
+MUST link's REST API doesn't document a maximum for `limit`, so this is a guess, not a confirmed safe value.
+If the server caps it lower, pagination still works correctly (the cursor is followed regardless of how many
+samples an actual page turns out to hold) -- it would just mean more, smaller pages than expected.
+"""
+
+MAX_PAGINATION_PAGES = 1000
+"""Safety limit on the number of pages `get_parameter_data()` follows via the paginated endpoint, guarding only
+against a runaway cursor (e.g. a server bug that never returns an empty one) -- not a limit MUST link documents
+or imposes itself. Deliberately generous (PAGE_SIZE * MAX_PAGINATION_PAGES == 5,000,000 samples at the current
+PAGE_SIZE): a flight telemetry series should never be silently truncated for a realistic query.
 """
 
 _PARAMETER_CATALOG_CACHE: dict[str, dict[str, dict[str, str]]] = {}
@@ -123,7 +139,13 @@ async def login(config_file: Path | None = None):
     return context
 
 
-async def must_request(ctx: MustContext, path: str, mode: str = "GET", payload: dict | None = None):
+async def must_request(
+    ctx: MustContext,
+    path: str,
+    mode: str = "GET",
+    payload: dict | None = None,
+    session: aiohttp.ClientSession | None = None,
+):
     """
     Do a get or post request to the must link API.
 
@@ -132,6 +154,9 @@ async def must_request(ctx: MustContext, path: str, mode: str = "GET", payload: 
         path (str): The API path to request, relative to the base url of must link.
         mode (str): The request mode, either 'GET' or 'POST'.
         payload (dict, optional): The payload for POST requests.
+        session (aiohttp.ClientSession, optional): An existing session to reuse, e.g. across the pages of one
+            paginated fetch -- each request otherwise pays for its own new TCP+TLS handshake. A temporary
+            session is created and closed for this one call when not given.
 
     Returns:
         The response data as a dictionary, or None if the request failed.
@@ -145,8 +170,11 @@ async def must_request(ctx: MustContext, path: str, mode: str = "GET", payload: 
     header = {"Authorization": ctx.token, "content-type": "application/json"}
     logger.debug(f"{header=}")
 
+    session_cm = (
+        contextlib.nullcontext(session) if session is not None else aiohttp.ClientSession(timeout=REQUEST_TIMEOUT)
+    )
     try:
-        async with aiohttp.ClientSession(timeout=REQUEST_TIMEOUT) as session:
+        async with session_cm as session:
             if mode == "GET":
                 async with session.get(url, headers=header) as response:
                     if response.status == 401:
@@ -690,7 +718,13 @@ def get_parameter_series(
 
 
 async def get_parameter_data(
-    ctx: MustContext, data_provider: str, par_name: str, start: str, end: str, paginated: bool = False
+    ctx: MustContext,
+    data_provider: str,
+    par_name: str,
+    start: str,
+    end: str,
+    paginated: bool = False,
+    truncated: list[bool] | None = None,
 ):
     """Retrieve parameter data for a parameter from a data provider within a specified time range.
 
@@ -708,6 +742,9 @@ async def get_parameter_data(
 
     - cursor: The cursor for pagination, empty string if no more data is available.
 
+    The plain (non-paginated) endpoint has no `limit` parameter of its own -- MUST link's REST API only
+    accepts `limit`/`cursor` on `.../data/paginated` -- so `limit` is only sent when `paginated` is True.
+
     Args:
         ctx (MustContext): The MUST link context.
         data_provider (str): The name of the data provider to retrieve data from.
@@ -715,6 +752,9 @@ async def get_parameter_data(
         start (str): The start time in 'YYYY-MM-DD HH:MM:SS' format.
         end (str): The end time in 'YYYY-MM-DD HH:MM:SS' format.
         paginated (bool): Whether to retrieve data in a paginated manner.
+        truncated (list[bool] | None): If given (only meaningful when `paginated` is True), `True` is appended
+            to it when the MAX_PAGINATION_PAGES safety limit was reached while more data was still available
+            (the cursor was non-empty), so the caller knows the returned data is incomplete.
 
     Returns:
         A dictionary containing the parameter data.
@@ -759,44 +799,56 @@ async def get_parameter_data(
     """
     cursor = ""
     count = 0
-    page_count = 20  # safety limit to avoid infinite loops
 
-    while True:
-        count += 1
-        if count > page_count:
-            break
+    # One session for every page of this fetch: must_request() otherwise opens a new TCP+TLS connection per
+    # call, which made pagination far slower than the single request it replaced.
+    async with aiohttp.ClientSession(timeout=REQUEST_TIMEOUT) as session:
+        while True:
+            count += 1
+            if count > MAX_PAGINATION_PAGES:
+                logger.warning(
+                    f"Reached the {MAX_PAGINATION_PAGES}-page safety limit while fetching {par_name!r} "
+                    f"({MAX_PAGINATION_PAGES * PAGE_SIZE:,} samples); more data was available. Data is incomplete."
+                )
+                if truncated is not None:
+                    truncated.append(True)
+                break
 
-        query_params: dict[str, str | int] = {
-            "key": "name",
-            "values": par_name,
-            "limit": 1000,
-        }
-        if start:
-            query_params["from"] = start
-        if end:
-            query_params["to"] = end
-        if paginated and cursor:
-            query_params["cursor"] = cursor
-
-        path = f"/dataproviders/{data_provider}/parameters/data{'/paginated' if paginated else ''}?{urlencode(query_params)}"
-
-        response = await must_request(ctx, path)
-        if VERBOSE_DEBUG:
-            logger.debug(f"{response=}")
-
-        if response is not None:
-            data = response
+            query_params: dict[str, str | int] = {
+                "key": "name",
+                "values": par_name,
+            }
             if paginated:
-                cursor = data.get("cursor")
-                logger.debug(f"{count=}, {cursor=}")
-                yield data.get("content", [])
-                if cursor in (None, ""):
+                query_params["limit"] = PAGE_SIZE
+            if start:
+                query_params["from"] = start
+            if end:
+                query_params["to"] = end
+            if paginated and cursor:
+                query_params["cursor"] = cursor
+
+            path = (
+                f"/dataproviders/{data_provider}/parameters/data{'/paginated' if paginated else ''}"
+                f"?{urlencode(query_params)}"
+            )
+
+            response = await must_request(ctx, path, session=session)
+            if VERBOSE_DEBUG:
+                logger.debug(f"{response=}")
+
+            if response is not None:
+                data = response
+                if paginated:
+                    cursor = data.get("cursor")
+                    logger.debug(f"{count=}, {cursor=}")
+                    yield data.get("content", [])
+                    if cursor in (None, ""):
+                        break
+                else:
+                    yield data
                     break
             else:
-                yield data
                 break
-        else:
-            break
 
 
 def get_raw_data_with_timestamp(data: dict) -> tuple[list[datetime.datetime], list[float]]:

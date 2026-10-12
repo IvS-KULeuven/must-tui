@@ -29,6 +29,12 @@ get_parameter_series_async:
 - Filters invalid parameter names in list input
 - Aggregates paginated sample chunks
 - Returns empty dict when context is not authenticated
+
+get_parameter_data:
+- limit is only sent on the paginated endpoint (the plain one has no such parameter)
+- Paginated mode follows the cursor across pages
+- Non-paginated mode makes exactly one request
+- Hitting MAX_PAGINATION_PAGES sets `truncated` and stops, even though the cursor was non-empty
 """
 
 import asyncio
@@ -419,3 +425,108 @@ def test_search_parameters_wrapper_delegates_to_async(monkeypatch):
 
     assert result == []
     assert called_with == {"name_pattern": "temp.*", "use_cache": False}
+
+
+async def _drain(agen):
+    return [item async for item in agen]
+
+
+def test_get_parameter_data_sends_limit_only_when_paginated(monkeypatch):
+    ctx = must.MustContext(base_url="http://fake", token="tok", authenticated=True)
+    paths = []
+
+    async def fake_must_request(_ctx, path, mode="GET", payload=None, session=None):
+        paths.append(path)
+        return {"content": []}
+
+    monkeypatch.setattr(must, "must_request", fake_must_request)
+
+    asyncio.run(_drain(must.get_parameter_data(ctx, "PLATO", "PAR", "2025-01-01", "2025-01-02", paginated=False)))
+
+    assert "limit=" not in paths[-1]
+    assert "/paginated" not in paths[-1]
+
+
+def test_get_parameter_data_paginated_sends_limit_and_follows_the_cursor(monkeypatch):
+    ctx = must.MustContext(base_url="http://fake", token="tok", authenticated=True)
+    pages = [
+        {"content": [{"data": [{"date": "1", "value": 1}]}], "cursor": "next-page"},
+        {"content": [{"data": [{"date": "2", "value": 2}]}], "cursor": ""},
+    ]
+    requested = []
+    sessions_used = []
+
+    async def fake_must_request(_ctx, path, mode="GET", payload=None, session=None):
+        requested.append(path)
+        sessions_used.append(session)
+        return pages.pop(0)
+
+    monkeypatch.setattr(must, "must_request", fake_must_request)
+
+    results = asyncio.run(_drain(must.get_parameter_data(ctx, "PLATO", "PAR", "", "", paginated=True)))
+
+    assert len(results) == 2
+    assert "/paginated" in requested[0]
+    assert f"limit={must.PAGE_SIZE}" in requested[0]
+    assert "cursor=" not in requested[0]
+    assert "cursor=next-page" in requested[1]
+    # one aiohttp session reused for every page, not a new TCP+TLS handshake per page
+    assert sessions_used[0] is not None
+    assert sessions_used[0] is sessions_used[1]
+
+
+def test_get_parameter_data_non_paginated_makes_a_single_request(monkeypatch):
+    ctx = must.MustContext(base_url="http://fake", token="tok", authenticated=True)
+    call_count = 0
+
+    async def fake_must_request(_ctx, path, mode="GET", payload=None, session=None):
+        nonlocal call_count
+        call_count += 1
+        return {"content": [{"data": [{"date": "1", "value": 1}]}]}
+
+    monkeypatch.setattr(must, "must_request", fake_must_request)
+
+    results = asyncio.run(_drain(must.get_parameter_data(ctx, "PLATO", "PAR", "", "", paginated=False)))
+
+    assert call_count == 1
+    assert results == [{"content": [{"data": [{"date": "1", "value": 1}]}]}]
+
+
+def test_get_parameter_data_sets_truncated_when_the_page_limit_is_reached(monkeypatch):
+    ctx = must.MustContext(base_url="http://fake", token="tok", authenticated=True)
+    monkeypatch.setattr(must, "MAX_PAGINATION_PAGES", 2)
+
+    async def fake_must_request(_ctx, path, mode="GET", payload=None, session=None):
+        return {"content": [{"data": [{"date": "1", "value": 1}]}], "cursor": "always-more"}
+
+    monkeypatch.setattr(must, "must_request", fake_must_request)
+
+    truncated: list[bool] = []
+    results = asyncio.run(
+        _drain(must.get_parameter_data(ctx, "PLATO", "PAR", "", "", paginated=True, truncated=truncated))
+    )
+
+    assert len(results) == 2  # exactly MAX_PAGINATION_PAGES pages were yielded, not more
+    assert truncated == [True]
+
+
+def test_get_parameter_data_not_truncated_when_the_cursor_runs_out_exactly_at_the_limit(monkeypatch):
+    ctx = must.MustContext(base_url="http://fake", token="tok", authenticated=True)
+    monkeypatch.setattr(must, "MAX_PAGINATION_PAGES", 2)
+    pages = [
+        {"content": [{"data": [{"date": "1", "value": 1}]}], "cursor": "next-page"},
+        {"content": [{"data": [{"date": "2", "value": 2}]}], "cursor": ""},
+    ]
+
+    async def fake_must_request(_ctx, path, mode="GET", payload=None, session=None):
+        return pages.pop(0)
+
+    monkeypatch.setattr(must, "must_request", fake_must_request)
+
+    truncated: list[bool] = []
+    results = asyncio.run(
+        _drain(must.get_parameter_data(ctx, "PLATO", "PAR", "", "", paginated=True, truncated=truncated))
+    )
+
+    assert len(results) == 2
+    assert truncated == []

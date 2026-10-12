@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Ctrl+Z` maximizes the plot and its controls (Clear Plot, Plot: TUI/Matplotlib, Data Range, the time range fields), hiding the header, footer, search box, parameter list and info panels; press again to restore. Unlike the single-letter shortcuts, it works even while the search box has focus.
+- A spinner now covers the plot while fetching data for a selection or a time range change, so it's clear the app is working rather than stuck — this can take a while for a parameter with many samples in the selected range.
+- The Parameter Metadata panel shows `plotted-samples`, the number of data points fetched for the current plot.
+
+### Fixed
+
+- The plot title now lists every currently plotted parameter (`Parameter: X` for one, `Parameters: X, Y, …` for several) instead of only the most recently selected one. This applies to both the TUI and Matplotlib plots. In the TUI plot, each name in the title is colored to match its trace — a real legend there can crash plotext (the terminal plotting library) in some situations, so this is used instead.
+
 ## [0.4.0] - 2026-10-12
 
 ### Changed

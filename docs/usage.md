@@ -116,6 +116,7 @@ parameter.
 | `parameter-type` | Parameter type |
 | `name` | MIB name |
 | `provider` | Data provider name |
+| `plotted-samples` | Number of data points fetched for the current plot; `–` while unknown (computed locally, not from MUST) |
 
 ### Plot Controls
 
@@ -162,10 +163,19 @@ fetches and plots its data for the current time range.
 
 The lower-right area renders a time-series plot of the selected parameter(s).  Multiple
 parameters can be overlaid — each new selection adds a trace without clearing previous ones.
+The title lists every currently plotted parameter (`Parameter: X` for one, `Parameters: X, Y, …`
+for several), each one colored to match its trace. The Matplotlib backend shows a real legend
+instead; a legend in the TUI plot can crash the terminal plotting library in some situations, so
+the title's coloring is used there instead.
 
 To keep the terminal plot fast, each trace is drawn with at most 1000 points. Long series are
 reduced by keeping the minimum and maximum of each time bucket, so spikes and dips remain
 visible. The Matplotlib backend always shows the full-resolution data.
+
+Fetching a parameter with many samples in the selected time range can take a while — the whole
+data set is retrieved before anything is drawn. A spinner covers the plot area while a selection
+or a time range change is being fetched, and the **Parameter Metadata** panel's `plotted-samples`
+field shows the resulting point count once it's done.
 
 Use the **Clear Plot** button (or press `c`) to reset the plot.
 
@@ -187,7 +197,12 @@ These bindings are available anywhere in the application:
 | `Ctrl+R` | Hard-reset the parameter cache (wipes SQLite cache, then re-fetches) |
 | `d` | Toggle light / dark mode |
 | `m` | Cycle plot marker style (Braille → SD → HD → Dot) |
+| `Ctrl+Z` | Maximize the plot and its controls, hiding everything else; press again to restore |
 | `Ctrl+Q` | Quit the application |
+
+The single-letter shortcuts (`c`, `p`, `r`, `d`, `m`) only work while the search box does not have
+focus — a focused text field takes plain letters as typed input first. The `Ctrl`-combinations
+always work, regardless of focus.
 
 ---
 

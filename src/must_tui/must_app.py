@@ -20,6 +20,10 @@ from textual.widgets.option_list import Option
 from textual_plotext import PlotextPlot as PlotWidget
 # rapidfuzz is not a direct dependency: it is the scoring engine that `thefuzz` (a dependency) is built on.
 from rapidfuzz import fuzz as rf_fuzz, process
+# plotext is not a direct dependency: it is the plotting engine textual-plotext (a dependency) wraps. Used
+# directly for colorize(): textual_plotext.Plot.colorize() forwards to it with the wrong keyword and always
+# raises TypeError.
+import plotext
 
 from must_tui.dialogs import ErrorDialog, WarningDialog
 from must_tui.matplotlib_bridge import MatplotlibPlotter, can_open_matplotlib_window
@@ -49,6 +53,9 @@ PARAMETER_METADATA_FIELDS = """
     description data-type first-sample last-sample subsystem id unit parameter-type name provider
 """.split()
 """The names of the fields in the parameter metadata obtained from the MUST server."""
+
+PLOTTED_SAMPLES_FIELD = "plotted-samples"
+"""Row key for the (locally computed, not server-provided) sample count shown in `ParameterMetadata`."""
 
 
 VERBOSE_DEBUG = bool_env("VERBOSE_DEBUG", False)
@@ -193,6 +200,8 @@ class ParameterMetadata(Static):
     - Name: mib name
     - Provider: name of the data provider
 
+    Also shows `plotted-samples`, the number of data points fetched for the parameter's current plot. This is
+    computed locally (not provided by MUST) and is reset to "–" whenever a new parameter is selected.
     """
 
     def __init__(self) -> None:
@@ -207,8 +216,14 @@ class ParameterMetadata(Static):
         log.debug(f"ParameterMetadata={metadata}")
         for idx, (key, value) in enumerate(self.metadata.items()):
             self.table.update_cell(key, "value", str(value), update_width=True)
+        self.set_sample_count(None)
 
         self.table.refresh()
+
+    def set_sample_count(self, count: int | None) -> None:
+        """Show how many samples were fetched for the parameter's current plot, or "–" while that's unknown."""
+
+        self.table.update_cell(PLOTTED_SAMPLES_FIELD, "value", "–" if count is None else f"{count:,}")
 
     def compose(self) -> ComposeResult:
         yield self.table
@@ -224,6 +239,7 @@ class ParameterMetadata(Static):
             if VERBOSE_DEBUG:
                 log.debug(f"Adding row: {field}={value}")
             self.table.add_row(field, str(value), key=field)
+        self.table.add_row(PLOTTED_SAMPLES_FIELD, "–", key=PLOTTED_SAMPLES_FIELD)
 
 
 class ParameterInfo(Static):
@@ -295,6 +311,42 @@ class ParameterInfo(Static):
 PLOT_DATE_FORM = "Y-m-d H:M:S"
 """plotext date format matching `format_datetime()`, for `Plot.date_form()` / `Plot.xlim()`."""
 
+PLOT_COLORS = (
+    "blue+", "green+", "red+", "cyan+", "magenta+", "orange+", "gray+", "blue", "green", "red", "cyan", "magenta",
+    "orange", "gray",
+)
+"""Colors cycled across plotted series in the TUI plot; the first five match plotext's own default order.
+Deliberately excludes black/white, which can blend into the background. Names must be ones `plotext.colorize()`
+accepts (see `plotext._dict.color_codes`); it has no `yellow` or `gold`, unlike plotext's own default sequence.
+"""
+
+
+def series_color(index: int) -> str:
+    """The TUI plot color for the series at `index` (its position among all plotted series, duplicates included)."""
+
+    return PLOT_COLORS[index % len(PLOT_COLORS)]
+
+
+def colored_plot_title(labels: list[str]) -> str:
+    """Like `plot_title()`, but each parameter name is colored (ANSI) to match its plotted series.
+
+    For a repeated label, the color of its first occurrence is used, matching the color `replot()` gives that
+    series (by `series_color()` on the same index). TUI only: the Matplotlib backend has a real legend and
+    keeps the plain `plot_title()`.
+    """
+
+    first_index: dict[str, int] = {}
+    for index, label in enumerate(labels):
+        first_index.setdefault(label, index)
+
+    if not first_index:
+        return "Parameter Data Plot"
+
+    colored = [plotext.colorize(label, color=series_color(index)) for label, index in first_index.items()]
+    if len(colored) == 1:
+        return f"Parameter: {colored[0]}"
+    return "Parameters: " + ", ".join(colored)
+
 
 class TimeRangePlotter(PlotWidget, can_focus=True):
     """Widget to plot parameter data over a specified time range."""
@@ -330,6 +382,7 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         self.time = []
         self.labels = []
         self.display_series = []
+        self.title = colored_plot_title(self.labels)
         self.plt.clear_data()
         self.replot()
 
@@ -350,11 +403,10 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
     ) -> None:
         """Update the plot when the input data changes."""
 
-        self.set_title(f"Parameter: {par_name}")
-
         self.time.append(timestamps)
         self.data.append(values)
         self.labels.append(par_name)
+        self.title = colored_plot_title(self.labels)
 
         display_time, display_values = downsample_min_max(timestamps, values)
         self.display_series.append(([x.strftime("%Y-%m-%d %H:%M:%S") for x in display_time], display_values))
@@ -376,8 +428,11 @@ class TimeRangePlotter(PlotWidget, can_focus=True):
         plotter.title(self.title)
         # self.plt.xlabel("Date-Time")  # takes too much real estate
         # self.plt.ylabel("Value")  # will be put in the same space as the x-label
-        for time, data in self.display_series:
-            plotter.plot(time, data, marker=self.marker)
+        # Not passing label= here: plotext's legend crashes (IndexError) when a labelled series has no point
+        # within the current xlim, e.g. briefly while reloading after a time range change. The title is
+        # colored to match each series instead (colored_plot_title()); color= here must stay in sync with it.
+        for index, (time, data) in enumerate(self.display_series):
+            plotter.plot(time, data, marker=self.marker, color=series_color(index))
         self.refresh()
 
     async def _watch_marker(self) -> None:
@@ -465,6 +520,7 @@ class MUSTApp(App[None]):
         ("ctrl+r", "reset_parameter_cache", "Reset parameter cache"),
         ("d", "app.toggle_dark", "Toggle light/dark mode"),
         ("m", "marker", "Cycle markers"),
+        ("ctrl+z", "toggle_plot_maximized", "Maximize plot"),
         ("ctrl+q", "app.quit", "Quit"),
     ]
 
@@ -477,6 +533,9 @@ class MUSTApp(App[None]):
 
     marker: var[str] = var("dot")
     """The marker used for each of the plots."""
+
+    plot_maximized: var[bool] = var(False)
+    """Whether the plot area (plot + its controls) is maximized, hiding the rest of the main screen."""
 
     def __init__(self, config_file: Path | None = None) -> None:
         super().__init__()
@@ -751,11 +810,14 @@ class MUSTApp(App[None]):
         Being exclusive, a further range change cancels a reload that is still running.
         """
 
+        self.plot_widget.loading = True
         try:
             await self._reload_plotted_parameters()
         except Exception as exc:
             log.error(f"Reloading the plotted parameters failed: {exc!r}")
             self.notify(f"Reloading the plotted parameters failed: {exc}", severity="error")
+        finally:
+            self.plot_widget.loading = False
 
     async def _reload_plotted_parameters(self) -> None:
         names = list(dict.fromkeys(self.plot_widget.labels))  # unique, in plot order
@@ -847,11 +909,14 @@ class MUSTApp(App[None]):
         Being exclusive, a new selection cancels a fetch that is still running.
         """
 
+        self.plot_widget.loading = True
         try:
             await self._plot_parameter(par_name)
         except Exception as exc:
             log.error(f"Plotting parameter {par_name} failed: {exc!r}")
             self.show_warning_dialog(f"Plotting parameter {par_name} failed: {exc}")
+        finally:
+            self.plot_widget.loading = False
 
     async def _plot_parameter(self, par_name: str) -> None:
         if not self.time_range.is_valid():
@@ -863,6 +928,7 @@ class MUSTApp(App[None]):
 
         data_provider = self.DATA_PROVIDER
         received_response = False
+        total_points = 0
 
         async for data in get_parameter_data(
             self.must_ctx,
@@ -883,6 +949,7 @@ class MUSTApp(App[None]):
                 self.show_warning_dialog(f"No data available for parameter {par_name} in the specified time range.")
                 continue
 
+            total_points += len(timestamps)
             self.plot_widget.set_xlimits(self.time_range.start, self.time_range.end)
             self.plot_widget.set_ylimits(min(values) - 1.0, max(values) + 1.0)
             await self.plot_widget.update(par_name, timestamps, values, self.time_range)
@@ -893,11 +960,25 @@ class MUSTApp(App[None]):
                     self.matplotlib_plotter.set_ylimits(min(values) - 1.0, max(values) + 1.0)
                     await self.matplotlib_plotter.update(par_name, timestamps, values, self.time_range)
 
+        self._show_sample_count(par_name, total_points if received_response else None)
+
         if not received_response:
             self.show_warning_dialog(
                 f"No response from the MUST server for parameter {par_name}. The request failed or timed out; "
                 "see the log for details."
             )
+
+    def _show_sample_count(self, par_name: str, count: int | None) -> None:
+        """Show how many samples were fetched for `par_name`, if its metadata panel is still the one displayed."""
+
+        if not self.screen_stack:
+            return
+        try:
+            parameter_metadata = self.screen.query_one(ParameterMetadata)
+        except NoMatches:
+            return
+        if parameter_metadata.par_name == par_name:
+            parameter_metadata.set_sample_count(count)
 
     def action_toggle_jump(self) -> None:
         controls = self._get_main_controls()
@@ -1067,6 +1148,18 @@ class MUSTApp(App[None]):
     def action_marker(self) -> None:
         """Cycle to the next marker type."""
         self.marker = next(self.markers)
+
+    def action_toggle_plot_maximized(self) -> None:
+        """Toggle whether the plot area (plot + its controls) fills the main screen."""
+
+        if not self._main_screen_active():
+            return
+        self.plot_maximized = not self.plot_maximized
+
+    def watch_plot_maximized(self, maximized: bool) -> None:
+        if not self._main_screen_active():
+            return
+        self.screen.set_class(maximized, "-plot-maximized")
 
     def action_clear_plot(self) -> None:
         if not self._main_screen_active():

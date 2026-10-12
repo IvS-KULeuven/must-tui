@@ -26,7 +26,7 @@ from rapidfuzz import fuzz as rf_fuzz, process
 # raises TypeError.
 import plotext
 
-from must_tui.dialogs import ErrorDialog, WarningDialog
+from must_tui.dialogs import ErrorDialog, HelpDialog, WarningDialog
 from must_tui.matplotlib_bridge import MatplotlibPlotter, can_open_matplotlib_window
 from must_tui.mib import read_pcf
 from must_tui.parameter_cache import get_parameter_cache_updated_at
@@ -91,6 +91,42 @@ def format_cache_age(updated_at: datetime.datetime | None) -> str:
         return f"{hours}h ago"
     days = int(hours // 24)
     return f"{days}d ago"
+
+
+HELP_KEYBINDINGS_PLACEHOLDER = "<!-- KEYBINDINGS -->"
+"""Marker in the bundled help.md replaced with a table generated from MUSTApp.BINDINGS.
+
+Keeping the table generated (rather than hand-written in help.md) means it can't drift from the actual
+bindings: there is exactly one place (MUSTApp.BINDINGS) that defines what a key does.
+"""
+
+
+def format_binding_key(key: str) -> str:
+    """Render a Binding key id like 'ctrl+q' or 'f1' as 'Ctrl+Q' / 'F1' for display."""
+
+    def format_part(part: str) -> str:
+        if part[:1].lower() == "f" and part[1:].isdigit():
+            return part.upper()
+        return part.capitalize()
+
+    return "+".join(format_part(part) for part in key.split("+"))
+
+
+def keybindings_markdown_table(bindings: list[Binding]) -> str:
+    """Render `bindings` as a Markdown table (key, action), skipping any without a description."""
+
+    rows = [(format_binding_key(binding.key), binding.description) for binding in bindings if binding.description]
+    header = "| Key | Action |\n| --- | --- |\n"
+    return header + "\n".join(f"| `{key}` | {description} |" for key, description in rows)
+
+
+def load_help_markdown() -> str:
+    """Read the bundled help.md, with its keybindings placeholder filled in from MUSTApp.BINDINGS."""
+
+    help_path = importlib.resources.files("must_tui").joinpath("data/help.md")
+    content = help_path.read_text()
+    table = keybindings_markdown_table(MUSTApp.BINDINGS)
+    return content.replace(HELP_KEYBINDINGS_PLACEHOLDER, table)
 
 
 SEARCH_DEBOUNCE = 0.15
@@ -554,21 +590,21 @@ class MUSTApp(App[None]):
     DATA_PROVIDER = "PLATO"
 
     BINDINGS = [
-        # Shown in the footer: reliable regardless of focus, since a focused Input swallows bare letters as
-        # typed text before they reach these bindings (see the single-letter ones below). "c" is kept as a
-        # hidden alias for muscle memory, but Ctrl+L is the one actually advertised.
+        # Every binding is a Ctrl-combo or a function key -- none are bare letters, so none are ever consumed
+        # by a focused Input as typed text (see the single-letter-vs-focus note this replaced in CLAUDE.md).
+        # Shown in the footer: the handful someone is likely to reach for constantly.
+        Binding("f1", "show_help", "Help"),
         Binding("ctrl+q", "app.quit", "Quit"),
         Binding("ctrl+l", "clear_plot", "Clear Plot"),
         Binding("ctrl+z", "toggle_plot_maximized", "Maximize plot"),
-        # Not shown in the footer -- still work as keys, but only while focus is elsewhere (e.g. not in the
-        # search box), and would otherwise clutter the footer or flicker in and out as focus moves around.
-        Binding("c", "clear_plot", "Clear Plot", show=False),
+        # Not shown in the footer, to keep it short -- all still work as keys everywhere, and are listed in
+        # the Help dialog (F1).
         Binding("ctrl+j", "toggle_jump", "Toggle Jump Mode", show=False),
-        Binding("p", "toggle_plot_backend", "Toggle plot backend", show=False),
-        Binding("r", "refresh_parameter_cache", "Refresh parameter cache", show=False),
+        Binding("f2", "toggle_plot_backend", "Toggle plot backend", show=False),
+        Binding("f3", "marker", "Cycle markers", show=False),
+        Binding("f4", "app.toggle_dark", "Toggle light/dark mode", show=False),
+        Binding("f5", "refresh_parameter_cache", "Refresh parameter cache", show=False),
         Binding("ctrl+r", "reset_parameter_cache", "Reset parameter cache", show=False),
-        Binding("d", "app.toggle_dark", "Toggle light/dark mode", show=False),
-        Binding("m", "marker", "Cycle markers", show=False),
     ]
 
     MARKERS = {
@@ -1108,6 +1144,9 @@ class MUSTApp(App[None]):
             return
         if parameter_metadata.par_name == par_name:
             parameter_metadata.set_sample_count(count)
+
+    def action_show_help(self) -> None:
+        self.push_screen(HelpDialog(load_help_markdown()))
 
     def action_toggle_jump(self) -> None:
         controls = self._get_main_controls()

@@ -67,34 +67,36 @@ def test_footer_bindings_are_the_same_regardless_of_focus(monkeypatch):
         await pilot.pause()
         shown_with_checkbox_focus = _shown_keys(app)
 
-        assert shown_with_input_focus == shown_with_checkbox_focus == {"ctrl+q", "ctrl+l", "ctrl+z"}
+        assert shown_with_input_focus == shown_with_checkbox_focus == {"f1", "ctrl+q", "ctrl+l", "ctrl+z"}
 
     _run_on_main_screen(monkeypatch, test)
 
 
-def test_single_letter_bindings_are_hidden_from_the_footer(monkeypatch):
+def test_non_footer_bindings_are_hidden_but_still_active(monkeypatch):
     async def test(app, pilot):
         checkbox = app.screen.query_one("#regex-checkbox", Checkbox)
         checkbox.focus()
         await pilot.pause()
 
         # They're still active (usable) bindings, just not advertised in the footer.
-        all_keys = set(app.active_bindings)
-        assert {"c", "p", "r", "d", "m", "ctrl+j", "ctrl+r"} <= all_keys
-        assert {"c", "p", "r", "d", "m", "ctrl+j", "ctrl+r"}.isdisjoint(_shown_keys(app))
+        hidden = {"ctrl+j", "f2", "f3", "f4", "f5", "ctrl+r"}
+        assert hidden <= set(app.active_bindings)
+        assert hidden.isdisjoint(_shown_keys(app))
 
     _run_on_main_screen(monkeypatch, test)
 
 
-def test_hidden_c_and_advertised_ctrl_l_both_clear_the_plot(monkeypatch):
+def test_ctrl_l_clears_the_plot_regardless_of_focus(monkeypatch):
     async def test(app, pilot):
+        # No bare letters remain in BINDINGS, so this must work the same whether the search Input (which
+        # swallows bare letters as typed text) or some other widget has focus.
+        app.plot_widget.labels = ["X"]
+        await pilot.press("ctrl+l")
+        assert app.plot_widget.labels == []
+
         checkbox = app.screen.query_one("#regex-checkbox", Checkbox)
         checkbox.focus()
         await pilot.pause()
-
-        app.plot_widget.labels = ["X"]
-        await pilot.press("c")
-        assert app.plot_widget.labels == []
 
         app.plot_widget.labels = ["X"]
         await pilot.press("ctrl+l")

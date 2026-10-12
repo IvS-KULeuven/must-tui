@@ -69,6 +69,15 @@ OptionList {
 /*    border: solid red; */
 }
 
+/* "z" toggles this: hide everything except the plot and its controls, which then fill the screen. */
+MainScreen.-plot-maximized Header,
+MainScreen.-plot-maximized Footer,
+MainScreen.-plot-maximized #input-container,
+MainScreen.-plot-maximized OptionList,
+MainScreen.-plot-maximized #info-container {
+    display: none;
+}
+
 DataTable {
 /*  border: round red; */
     width: 100%;

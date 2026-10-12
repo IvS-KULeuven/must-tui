@@ -4,12 +4,23 @@ import datetime as dt
 import aiohttp
 from aiohttp import web
 
+import plotext
 import pytest
+from textual.app import App
+from textual.widgets import OptionList
 
 import must_tui.must as must
 import must_tui.must_app as must_app
-from must_tui.matplotlib_bridge import MatplotlibPlotter
-from must_tui.must_app import downsample_min_max, parameter_data_range
+from must_tui.matplotlib_bridge import MatplotlibPlotter, plot_title
+from must_tui.must_app import (
+    PLOT_COLORS,
+    ParameterMetadata,
+    TimeRangePlotter,
+    colored_plot_title,
+    downsample_min_max,
+    parameter_data_range,
+    series_color,
+)
 from must_tui.time_range_input import TimeRange
 
 
@@ -38,6 +49,102 @@ def test_downsample_limits_points_and_keeps_spikes_in_time_order():
     assert max(ds_values) == 1e6
     assert min(ds_values) == -1e6
     assert ds_time == sorted(ds_time)
+
+
+@pytest.mark.parametrize(
+    "labels, expected",
+    [
+        ([], "Parameter Data Plot"),
+        (["PAR_A"], "Parameter: PAR_A"),
+        (["PAR_A", "PAR_A"], "Parameter: PAR_A"),  # same parameter selected twice
+        (["PAR_A", "PAR_B"], "Parameters: PAR_A, PAR_B"),
+        (["PAR_A", "PAR_B", "PAR_A"], "Parameters: PAR_A, PAR_B"),  # re-selected, order of first appearance kept
+    ],
+)
+def test_plot_title(labels, expected):
+    assert plot_title(labels) == expected
+
+
+def test_series_color_cycles_through_the_palette():
+    assert series_color(0) == PLOT_COLORS[0]
+    assert series_color(1) == PLOT_COLORS[1]
+    assert series_color(len(PLOT_COLORS)) == PLOT_COLORS[0]  # wraps around
+
+
+@pytest.mark.parametrize(
+    "labels, expected_plain",
+    [
+        ([], "Parameter Data Plot"),
+        (["PAR_A"], "Parameter: PAR_A"),
+        (["PAR_A", "PAR_A"], "Parameter: PAR_A"),
+        (["PAR_A", "PAR_B"], "Parameters: PAR_A, PAR_B"),
+        (["PAR_A", "PAR_B", "PAR_A"], "Parameters: PAR_A, PAR_B"),
+    ],
+)
+def test_colored_plot_title_matches_plot_title_once_uncolored(labels, expected_plain):
+    assert plotext.uncolorize(colored_plot_title(labels)) == expected_plain
+
+
+def test_colored_plot_title_colors_each_name_to_match_its_series():
+    colored = colored_plot_title(["PAR_A", "PAR_B"])
+
+    assert plotext.colorize("PAR_A", color=series_color(0)) in colored
+    assert plotext.colorize("PAR_B", color=series_color(1)) in colored
+
+
+def test_colored_plot_title_uses_the_first_occurrences_color_for_a_repeated_label():
+    colored = colored_plot_title(["PAR_A", "PAR_B", "PAR_A"])
+
+    # PAR_A first appears at index 0, not at its repeat at index 2
+    assert plotext.colorize("PAR_A", color=series_color(0)) in colored
+    assert plotext.colorize("PAR_A", color=series_color(2)) not in colored
+
+
+def test_time_range_plotter_title_covers_all_plotted_parameters():
+    plotter = TimeRangePlotter(must.MustContext())
+    timestamps, values = _series(3)
+
+    asyncio.run(plotter.update("PAR_A", timestamps, values, None))
+    assert plotext.uncolorize(plotter.title) == "Parameter: PAR_A"
+    assert plotter.title != "Parameter: PAR_A"  # actually colored, not plain text
+
+    asyncio.run(plotter.update("PAR_B", timestamps, values, None))
+    assert plotext.uncolorize(plotter.title) == "Parameters: PAR_A, PAR_B"
+
+    plotter.clear_plot()
+    assert plotter.title == "Parameter Data Plot"
+
+
+def test_time_range_plotter_renders_when_the_plotted_data_is_outside_xlimits():
+    # Regression test: passing label= to plotext's plot() (for a legend) crashes with IndexError when a
+    # labelled series has no point within the current xlim -- e.g. briefly while reloading after a time range
+    # change, when set_xlimits() has already moved to the new range but the old out-of-range data is still
+    # plotted. Do not add label= back to TimeRangePlotter.replot()'s plotter.plot() call without fixing this.
+    plotter = TimeRangePlotter(must.MustContext())
+    plotter.plt.plotsize(131, 18)
+    timestamps = [dt.datetime(2025, 7, 23, 14, 29, 14) + dt.timedelta(minutes=i) for i in range(40)]
+    values = [1000.0 + i * 50 for i in range(40)]
+
+    plotter.set_xlimits(timestamps[0] + dt.timedelta(days=10), timestamps[-1] + dt.timedelta(days=10))
+    plotter.set_ylimits(min(values) - 1, max(values) + 1)
+    asyncio.run(plotter.update("A9BA0004", timestamps, values, None))
+
+    plotter.plt.build()  # must not raise
+
+
+def test_matplotlib_plotter_title_covers_all_plotted_parameters():
+    plotter = MatplotlibPlotter()
+    plotter._stdin = _CountingPipe()
+    timestamps, values = _series(3)
+
+    asyncio.run(plotter.update("PAR_A", timestamps, values, None))
+    assert plotter.title == "Parameter: PAR_A"
+
+    asyncio.run(plotter.update("PAR_B", timestamps, values, None))
+    assert plotter.title == "Parameters: PAR_A, PAR_B"
+
+    plotter.clear_plot()
+    assert plotter.title == "Parameter Data Plot"
 
 
 def test_parameter_data_range_uses_first_and_last_sample():
@@ -238,3 +345,134 @@ def test_plot_parameter_refuses_start_after_end(monkeypatch):
 
     assert fetched == []
     assert len(app.warnings) == 1 and "must be before the end time" in app.warnings[0]
+
+
+def test_toggle_plot_maximized_hides_everything_but_the_plot_and_its_controls(monkeypatch):
+    async def fake_initialize(self):
+        self.install_screen(must_app.MainScreen(), name="main")
+        self.push_screen("main")
+
+    monkeypatch.setattr(must_app.MUSTApp, "_initialize_and_show_main_screen", fake_initialize)
+
+    async def run():
+        app = must_app.MUSTApp()
+        async with app.run_test(size=(160, 40)) as pilot:
+            while not isinstance(app.screen, must_app.MainScreen):
+                await pilot.pause(0.05)
+            await pilot.pause()
+
+            option_list = app.screen.query_one(OptionList)
+            search_box = app.screen.query_one("#input-container")
+            info = app.screen.query_one("#info-container")
+            plot_controls = app.screen.query_one("#plot-controls")
+            before_width = app.plot_widget.region.width
+
+            await pilot.press("ctrl+z")  # works even though the search Input (not these) has focus by default
+            await pilot.pause()
+
+            assert app.plot_maximized is True
+            assert option_list.display is False
+            assert search_box.display is False
+            assert info.display is False
+            assert plot_controls.display is True
+            assert app.plot_widget.display is True
+            assert app.plot_widget.region.width > before_width  # the plot now fills the freed-up space
+
+            await pilot.press("ctrl+z")
+            await pilot.pause()
+
+            assert app.plot_maximized is False
+            assert option_list.display is True
+            assert app.plot_widget.region.width == before_width
+
+    asyncio.run(run())
+
+
+class _MetadataHost(App):
+    def compose(self):
+        yield ParameterMetadata()
+
+
+def _run_metadata(test):
+    async def main():
+        app = _MetadataHost()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await test(app, pilot)
+
+    asyncio.run(main())
+
+
+def test_set_sample_count_shows_a_comma_formatted_number():
+    async def test(app, pilot):
+        metadata = app.query_one(ParameterMetadata)
+        metadata.set_sample_count(123456)
+        assert metadata.table.get_cell(must_app.PLOTTED_SAMPLES_FIELD, "value") == "123,456"
+
+    _run_metadata(test)
+
+
+def test_set_sample_count_none_shows_a_placeholder():
+    async def test(app, pilot):
+        metadata = app.query_one(ParameterMetadata)
+        metadata.set_sample_count(42)
+        metadata.set_sample_count(None)
+        assert metadata.table.get_cell(must_app.PLOTTED_SAMPLES_FIELD, "value") == "–"
+
+    _run_metadata(test)
+
+
+def test_update_metadata_resets_the_sample_count():
+    async def test(app, pilot):
+        metadata = app.query_one(ParameterMetadata)
+        metadata.set_sample_count(999)
+        await metadata.update_metadata("PAR_X", {"description": "Some parameter"})
+        assert metadata.table.get_cell(must_app.PLOTTED_SAMPLES_FIELD, "value") == "–"
+
+    _run_metadata(test)
+
+
+def test_show_sample_count_ignores_a_stale_parameter_name():
+    app = must_app.MUSTApp()
+
+    app._show_sample_count("SOME_PAR", 10)  # no screen at all: must not raise
+
+
+def test_plot_parameter_shows_a_spinner_and_the_sample_count(monkeypatch):
+    async def fake_initialize(self):
+        self.install_screen(must_app.MainScreen(), name="main")
+        self.push_screen("main")
+
+    monkeypatch.setattr(must_app.MUSTApp, "_initialize_and_show_main_screen", fake_initialize)
+
+    loading_during_fetch = []
+    sample_epoch_ms = int(dt.datetime(2025, 12, 2).timestamp() * 1000)
+
+    async def fake_get_parameter_data(*_args, **_kwargs):
+        loading_during_fetch.append(app.plot_widget.loading)
+        data = [{"date": str(sample_epoch_ms + h * 3_600_000), "value": float(h)} for h in range(24)]
+        yield {"content": [{"data": data}]}
+
+    monkeypatch.setattr(must_app, "get_parameter_data", fake_get_parameter_data)
+
+    async def run():
+        async with app.run_test(size=(120, 30)) as pilot:
+            while not isinstance(app.screen, must_app.MainScreen):
+                await pilot.pause(0.05)
+            await pilot.pause()
+
+            metadata = app.screen.query_one(ParameterMetadata)
+            await metadata.update_metadata("PAR_X", {})
+            app.time_range = TimeRange(dt.datetime(2025, 12, 2), dt.datetime(2025, 12, 3))
+
+            assert app.plot_widget.loading is False
+            await app.plot_parameter("PAR_X").wait()
+            await pilot.pause()
+
+            assert app.plot_widget.loading is False
+            assert metadata.table.get_cell(must_app.PLOTTED_SAMPLES_FIELD, "value") == "24"
+
+    app = must_app.MUSTApp()
+    asyncio.run(run())
+
+    assert loading_during_fetch == [True]

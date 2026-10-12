@@ -18,6 +18,17 @@ def can_open_matplotlib_window() -> bool:
     return any(os.environ.get(variable) for variable in ("DISPLAY", "WAYLAND_DISPLAY", "MIR_SOCKET"))
 
 
+def plot_title(labels: list[str]) -> str:
+    """The plot title for the given plotted parameter labels (in plot order, possibly with repeats)."""
+
+    unique = list(dict.fromkeys(labels))
+    if not unique:
+        return "Parameter Data Plot"
+    if len(unique) == 1:
+        return f"Parameter: {unique[0]}"
+    return "Parameters: " + ", ".join(unique)
+
+
 class MatplotlibPlotter:
     """Render the selected parameter data in a separate matplotlib process."""
 
@@ -94,6 +105,7 @@ class MatplotlibPlotter:
         self.data = []
         self.time = []
         self.labels = []
+        self.title = plot_title(self.labels)
         self._send_state()
 
     def sync_from_plotter(self, plotter: Any) -> None:
@@ -109,10 +121,10 @@ class MatplotlibPlotter:
     async def update(
         self, par_name: str, timestamps: list[datetime.datetime], values: list[float], _time_range: Any
     ) -> None:
-        self.set_title(f"Parameter: {par_name}")
         self.time.append(timestamps)
         self.data.append(values)
         self.labels.append(par_name)
+        self.title = plot_title(self.labels)
         self._send_state()
 
     def close(self) -> None:

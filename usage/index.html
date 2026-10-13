@@ -1,0 +1,1334 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for the must-tui project">
+      
+      
+      
+        <link rel="canonical" href="https://ivs-kuleuven.github.io/must-tui/usage/">
+      
+      
+        <link rel="prev" href="../user/">
+      
+      
+        <link rel="next" href="../developer/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Using the TUI - must-tui</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../stylesheets/api.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#using-the-tui" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="must-tui" class="md-header__button md-logo" aria-label="must-tui" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            must-tui
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Using the TUI
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/IvS-KULeuven/must-tui" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    IvS-KULeuven/must-tui
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="must-tui" class="md-nav__button md-logo" aria-label="must-tui" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    must-tui
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/IvS-KULeuven/must-tui" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    IvS-KULeuven/must-tui
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the TUI
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using the TUI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#layout-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#panels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Panels
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Panels">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#search-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search Input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter List
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter Info
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter Metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plot-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot Controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#global-key-bindings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global Key Bindings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-screens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup Screens
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Startup Screens">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#loading-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading Screen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#main-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Main Screen
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plot-backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot Backends
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plot Backends">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tui-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TUI (default)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#matplotlib" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matplotlib
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#layout-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#panels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Panels
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Panels">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#search-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search Input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter List
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-info" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter Info
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parameter-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameter Metadata
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plot-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot Controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#global-key-bindings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global Key Bindings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup-screens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup Screens
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Startup Screens">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#loading-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loading Screen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#main-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Main Screen
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plot-backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plot Backends
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Plot Backends">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tui-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TUI (default)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#matplotlib" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matplotlib
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="using-the-tui">Using the TUI<a class="headerlink" href="#using-the-tui" title="Permanent link">&para;</a></h1>
+<p>The MUST TUI launches in a terminal and provides interactive access to telemetry parameters,
+their metadata, and time-series plots.</p>
+<p>Press <code>F1</code> at any time for an in-app help screen covering usage and the full list of keyboard
+shortcuts — the same reference as the <a href="#global-key-bindings">Global Key Bindings</a> section below,
+generated from the app's own bindings so the two can't drift apart.</p>
+<p><img alt="MUSTApp TUI screenshot" src="../images/mustapp-tui.png" /></p>
+<hr />
+<h2 id="layout-overview">Layout Overview<a class="headerlink" href="#layout-overview" title="Permanent link">&para;</a></h2>
+<p>The interface is divided into six main areas:</p>
+<pre><code>┌──────────────────────────────────────────────────────────┐
+│  Header                                                  │
+├──────────────────────────────────────────────────────────┤
+│  Search Input                              [Regex] □     │
+├─────────────────┬────────────────────────────────────────┤
+│                 │  Parameter Info  │  Parameter Metadata │
+│  Parameter List ├──────────────────────────────────────  │
+│                 │  Plot Controls                         │
+│                 ├────────────────────────────────────────┤
+│                 │  Plot                                  │
+├─────────────────┴────────────────────────────────────────┤
+│  Status Line (provider, connection, catalog, cache age)  │
+├──────────────────────────────────────────────────────────┤
+│  Footer (key bindings)                                   │
+└──────────────────────────────────────────────────────────┘
+</code></pre>
+<hr />
+<h2 id="panels">Panels<a class="headerlink" href="#panels" title="Permanent link">&para;</a></h2>
+<h3 id="search-input">Search Input<a class="headerlink" href="#search-input" title="Permanent link">&para;</a></h3>
+<p>The search box at the top filters or navigates the parameter list as you type.</p>
+<ul>
+<li><strong>Filter mode</strong> (default): The list is narrowed down to parameters whose name or description
+  match the search text.  By default the search text is treated as a regular expression.
+  Uncheck the <strong>Regex</strong> checkbox to switch to fuzzy matching instead.</li>
+<li><strong>Jump mode</strong>: The best fuzzy match is highlighted in the alphabetically sorted list, with up to
+  500 neighbouring parameters shown around it. Toggle jump mode with <code>Ctrl+J</code>.</li>
+</ul>
+<p>The <strong>Regex</strong> checkbox (top-right of the search bar) switches between regex and fuzzy matching
+while in filter mode.</p>
+<p>The search checks the MIB name, the description shown in brackets in the list, and the MUST/PCF
+extended description — each as its own field, so an anchored pattern like <code>^NC01_FRAME</code> matches
+the bracketed description directly, not just where it happens to sit inside the full list entry.</p>
+<p>The search runs once you pause typing for a moment, not on every keystroke, and a spinner covers
+the parameter list while it's running. While a regular expression is incomplete or invalid (e.g.
+an unclosed parenthesis), the list keeps showing the previous matches.</p>
+<h3 id="parameter-list">Parameter List<a class="headerlink" href="#parameter-list" title="Permanent link">&para;</a></h3>
+<p>The left panel lists all parameters retrieved from the MUST server for the configured data
+provider.  Each entry is shown as:</p>
+<pre><code>MIBNAME [Description]
+</code></pre>
+<p>To keep the interface responsive, the list shows at most 500 parameters at a time out of however
+many currently match. When there are more, the last entry reports how many are left out; select it
+(or press <strong>Enter</strong> while it's highlighted) to load all of them — this can take a few seconds for a
+very large, unfiltered list — or refine the search instead to narrow it down.</p>
+<p>Scroll through the list with the arrow keys or the mouse. Press <strong>Enter</strong> (or click) to select
+a parameter — this loads its MIB info, server metadata, and time-series data into the other panels.
+Server data is loaded in the background, so the interface stays responsive. If you select another
+parameter before the previous one has finished loading, the previous request is cancelled and only
+the latest selection is loaded. A request is abandoned, and reported in a dialog, when the MUST
+server sends no data for 30 seconds; slow transfers that keep receiving data are not interrupted.</p>
+<h3 id="parameter-info">Parameter Info<a class="headerlink" href="#parameter-info" title="Permanent link">&para;</a></h3>
+<p>The upper-centre panel shows technical details read from the <strong>PCF file of the MIB</strong> for the
+selected parameter.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>par_name</code></td>
+<td>MIB parameter name</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>Short mnemonic description</td>
+</tr>
+<tr>
+<td><code>description_2</code></td>
+<td>Extended description</td>
+</tr>
+<tr>
+<td><code>pid</code></td>
+<td>On-board identifier of the telemetry parameter</td>
+</tr>
+<tr>
+<td><code>unit</code></td>
+<td>Engineering unit mnemonic</td>
+</tr>
+<tr>
+<td><code>decim</code></td>
+<td>Number of decimal places to be used for displaying real values of this monitoring parameter</td>
+</tr>
+<tr>
+<td><code>ptc</code></td>
+<td>Parameter Type Code</td>
+</tr>
+<tr>
+<td><code>pfc</code></td>
+<td>Parameter Format Code</td>
+</tr>
+<tr>
+<td><code>width</code></td>
+<td>'Padded' width of this parameter expressed in number of bits</td>
+</tr>
+<tr>
+<td><code>valid</code></td>
+<td>Name of the parameter to be used to determine the state validity of the parameter specified in this record</td>
+</tr>
+<tr>
+<td><code>related</code></td>
+<td>Name of monitoring parameter</td>
+</tr>
+<tr>
+<td><code>categ</code></td>
+<td>Calibration category: N=numeric, S=status, T=text</td>
+</tr>
+<tr>
+<td><code>natur</code></td>
+<td>Nature of the parameter: R=raw, D=dynamic OL, H=hardcoded, S=save synthetic, C=constant</td>
+</tr>
+<tr>
+<td><code>curtx</code></td>
+<td>Parameter calibration identification name</td>
+</tr>
+<tr>
+<td><code>inter</code></td>
+<td>Flag controlling extrapolation behavior</td>
+</tr>
+<tr>
+<td><code>uscon</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>parval</code></td>
+<td>Raw value for a constant parameter</td>
+</tr>
+<tr>
+<td><code>subsys</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>valpar</code></td>
+<td>Raw value for a validity parameter</td>
+</tr>
+<tr>
+<td><code>sptype</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>corr</code></td>
+<td>Flag that controls correlation of absolute time parameters</td>
+</tr>
+<tr>
+<td><code>obtid</code></td>
+<td>OBT ID</td>
+</tr>
+<tr>
+<td><code>darc</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>endian</code></td>
+<td>Endianness: 'B' or 'L'</td>
+</tr>
+</tbody>
+</table>
+<h3 id="parameter-metadata">Parameter Metadata<a class="headerlink" href="#parameter-metadata" title="Permanent link">&para;</a></h3>
+<p>The upper-right panel shows live metadata fetched from the <strong>MUST server</strong> for the selected
+parameter.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>description</code></td>
+<td>Parameter mnemonic from the server</td>
+</tr>
+<tr>
+<td><code>data-type</code></td>
+<td>Data type (e.g. <code>UNSIGNED_SMALL_INT</code>)</td>
+</tr>
+<tr>
+<td><code>first-sample</code></td>
+<td>Timestamp of the earliest available sample</td>
+</tr>
+<tr>
+<td><code>last-sample</code></td>
+<td>Timestamp of the most recent available sample</td>
+</tr>
+<tr>
+<td><code>subsystem</code></td>
+<td>Subsystem (e.g. <code>TM</code>)</td>
+</tr>
+<tr>
+<td><code>id</code></td>
+<td>Internal parameter identifier</td>
+</tr>
+<tr>
+<td><code>unit</code></td>
+<td>Engineering unit</td>
+</tr>
+<tr>
+<td><code>parameter-type</code></td>
+<td>Parameter type</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>MIB name</td>
+</tr>
+<tr>
+<td><code>provider</code></td>
+<td>Data provider name</td>
+</tr>
+<tr>
+<td><code>plotted-samples</code></td>
+<td>Number of data points fetched for the current plot; <code>–</code> while unknown (computed locally, not from MUST)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="plot-controls">Plot Controls<a class="headerlink" href="#plot-controls" title="Permanent link">&para;</a></h3>
+<p>A toolbar between the info panels and the plot area:</p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Clear Plot</strong> button</td>
+<td>Remove all plotted traces</td>
+</tr>
+<tr>
+<td><strong>Plot: TUI / Plot: Matplotlib</strong> button</td>
+<td>Toggle between the built-in TUI plot and an external Matplotlib window</td>
+</tr>
+<tr>
+<td><strong>Data Range</strong> button</td>
+<td>Set the time range to the selected parameter's first and last sample, as reported by MUST</td>
+</tr>
+<tr>
+<td><strong>Y Range</strong> button</td>
+<td>Set an explicit Y-axis minimum and maximum, or go back to auto-scaling</td>
+</tr>
+<tr>
+<td><strong>Start → End</strong> fields</td>
+<td>Set the start and end time for data retrieval and the plot x-axis</td>
+</tr>
+<tr>
+<td><strong>Lock</strong> checkbox</td>
+<td>Keep the duration fixed: changing one end moves the other end along</td>
+</tr>
+</tbody>
+</table>
+<p>By default the Y-axis auto-scales to fit whatever is currently plotted. The <strong>Y Range</strong> button opens
+a small dialog with <strong>Min</strong> and <strong>Max</strong> fields (pre-filled with the currently plotted data's range,
+or the active locked range if one is set) and three actions: <strong>Apply</strong> (validates that Min is less
+than Max), <strong>Auto</strong> (clears the locked range immediately), and <strong>Cancel</strong>. Once a range is locked,
+it stays in effect — across new parameter selections, time range reloads, and clearing the plot —
+until you choose <strong>Auto</strong> again, for both the TUI and Matplotlib backends.</p>
+<p>Type a date-time as <code>YYYY-MM-DD HH:MM:SS</code>. Shorter forms are accepted too: <code>YYYY-MM-DD HH:MM</code>
+(seconds 0) and <code>YYYY-MM-DD</code> (midnight). A field is applied when you press <strong>Enter</strong> or leave it
+(e.g. with <strong>Tab</strong>); typing alone changes nothing. <strong>Escape</strong> leaves the field, committing a
+pending valid edit first, the same as <strong>Tab</strong>.</p>
+<p>Relative forms are also accepted, resolved against the current local time:</p>
+<ul>
+<li><code>now</code>, <code>today</code>, <code>yesterday</code>, <code>tomorrow</code> — <code>today</code>/<code>yesterday</code>/<code>tomorrow</code> snap to local midnight;
+  <code>now</code> keeps the current time, to the second.</li>
+<li>Any of those with a signed offset, e.g. <code>now-6h</code>, <code>tomorrow+1d</code>, <code>yesterday-3h</code>. The offset uses
+  <code>w</code>eeks, <code>d</code>ays, <code>h</code>ours, <code>m</code>inutes and <code>s</code>econds, and they can be combined: <code>now-1d2h30m</code>.</li>
+<li>A bare offset such as <code>-2h30m</code> or <code>+1w</code> is relative to <code>now</code>. The sign is required (<code>6h</code> alone is
+  rejected as ambiguous).</li>
+</ul>
+<p><strong>↑ / ↓</strong> step the date-time component the cursor is on (year, month, day, hour, minute, second) up
+or down by one, directly in the field's text — without applying it, so pending edits are still only
+applied on <strong>Enter</strong>/<strong>Tab</strong>/<strong>Escape</strong>. Stepping a relative expression first resolves it to an
+absolute date-time, then steps it. Stepping the day/month clamps to the last valid day of the
+resulting month (e.g. 31 Jan + 1 month → 28 Feb); stepping past year 1000 or 9999 does nothing.</p>
+<p>If the text is not a valid date-time, or the start would not be before the end, the field turns red,
+a notification explains why, and the time range stays as it was. Editing the field removes the red
+mark.</p>
+<p>When the time range changes, the x-axis moves to the new range and all plotted parameters are
+fetched again for it. A notification shows when the reload starts and when it is done; parameters
+without data in the new range are listed there and removed from the plot. Selecting a parameter
+fetches and plots its data for the current time range.</p>
+<h3 id="plot">Plot<a class="headerlink" href="#plot" title="Permanent link">&para;</a></h3>
+<p>The lower-right area renders a time-series plot of the selected parameter(s).  Multiple
+parameters can be overlaid — each new selection adds a trace without clearing previous ones.
+The title lists every currently plotted parameter (<code>Parameter: X</code> for one, <code>Parameters: X, Y, …</code>
+for several), each one colored to match its trace. The Matplotlib backend shows a real legend
+instead; a legend in the TUI plot can crash the terminal plotting library in some situations, so
+the title's coloring is used there instead.</p>
+<p>To keep the terminal plot fast, each trace is drawn with at most 1000 points. Long series are
+reduced by keeping the minimum and maximum of each time bucket, so spikes and dips remain
+visible. The Matplotlib backend always shows the full-resolution data.</p>
+<p>Fetching a parameter with many samples in the selected time range can take a while — data is
+retrieved page by page (5000 samples per request, over one reused connection, to avoid one huge
+request to the MUST server), and all of it is retrieved before anything is drawn. A spinner covers
+the plot area while a selection or a time range change is being fetched, and the <strong>Parameter
+Metadata</strong> panel's <code>plotted-samples</code> field shows the resulting point count once it's done. If a
+single parameter's data in the selected range is extremely large (over 5,000,000 samples), a
+notification reports that only the first part of it was loaded.</p>
+<p>Use the <strong>Clear Plot</strong> button (or press <code>Ctrl+L</code>) to reset the plot.</p>
+<p>The plot marker style can be cycled through four options (Braille, Standard Definition, High
+Definition, Dot) with <code>F3</code>.</p>
+<hr />
+<h2 id="global-key-bindings">Global Key Bindings<a class="headerlink" href="#global-key-bindings" title="Permanent link">&para;</a></h2>
+<p>These bindings are available anywhere in the application. Every one of them is a <code>Ctrl</code>-combo or a
+function key — none are bare letters, so none are ever swallowed by the search box as typed text,
+regardless of where focus is:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>F1</code></td>
+<td>Open this help</td>
+</tr>
+<tr>
+<td><code>Ctrl+Q</code></td>
+<td>Quit the application</td>
+</tr>
+<tr>
+<td><code>Ctrl+L</code></td>
+<td>Clear all traces from the plot</td>
+</tr>
+<tr>
+<td><code>Ctrl+Z</code></td>
+<td>Maximize the plot and its controls, hiding everything else; press again to restore</td>
+</tr>
+<tr>
+<td><code>Ctrl+J</code></td>
+<td>Toggle between <strong>Filter</strong> and <strong>Jump</strong> search mode</td>
+</tr>
+<tr>
+<td><code>F2</code></td>
+<td>Toggle plot backend between TUI (built-in) and Matplotlib</td>
+</tr>
+<tr>
+<td><code>F3</code></td>
+<td>Cycle plot marker style (Braille → SD → HD → Dot)</td>
+</tr>
+<tr>
+<td><code>F4</code></td>
+<td>Toggle light / dark mode</td>
+</tr>
+<tr>
+<td><code>F5</code></td>
+<td>Soft-refresh the parameter cache (fetches from server, keeps SQLite cache)</td>
+</tr>
+<tr>
+<td><code>Ctrl+R</code></td>
+<td>Hard-reset the parameter cache (wipes SQLite cache, then re-fetches)</td>
+</tr>
+</tbody>
+</table>
+<p>Only the first four (<code>F1</code>, <code>Ctrl+Q</code>, <code>Ctrl+L</code>, <code>Ctrl+Z</code>) are shown in the footer, to keep it short;
+the rest still work exactly the same, they're just not advertised there. The full table — generated
+from the same bindings the app actually uses, so it can't go out of date — is always available by
+pressing <code>F1</code>.</p>
+<p>The status line above the footer shows the data provider, connection state, the number of
+parameters currently loaded, and how long ago the parameter cache was last refreshed.</p>
+<hr />
+<h2 id="startup-screens">Startup Screens<a class="headerlink" href="#startup-screens" title="Permanent link">&para;</a></h2>
+<h3 id="loading-screen">Loading Screen<a class="headerlink" href="#loading-screen" title="Permanent link">&para;</a></h3>
+<p>On startup the app shows a loading screen while it:</p>
+<ol>
+<li>Authenticates with the MUST server.</li>
+<li>Loads MIB parameter info from the bundled <code>pcf.dat</code>.</li>
+<li>Fetches the parameter catalog.</li>
+</ol>
+<p>If authentication fails the app offers the choice to <strong>Abort</strong> or continue in <strong>offline mode</strong>
+(no server data, MIB browsing only).</p>
+<h3 id="main-screen">Main Screen<a class="headerlink" href="#main-screen" title="Permanent link">&para;</a></h3>
+<p>After loading, the main screen is shown with the parameter list.  The parameter catalog is
+loaded from the local SQLite cache when available. A background refresh from the server runs at
+startup only when the cache is missing or older than one day; press <code>F5</code> to refresh it at any time.</p>
+<hr />
+<h2 id="plot-backends">Plot Backends<a class="headerlink" href="#plot-backends" title="Permanent link">&para;</a></h2>
+<h3 id="tui-default">TUI (default)<a class="headerlink" href="#tui-default" title="Permanent link">&para;</a></h3>
+<p>The built-in Textual plot renders directly in the terminal.  No graphical session is required.</p>
+<h3 id="matplotlib">Matplotlib<a class="headerlink" href="#matplotlib" title="Permanent link">&para;</a></h3>
+<p>Requires a graphical desktop session with a window manager.  When enabled, an external
+Matplotlib window opens alongside the terminal and stays in sync with the time range and
+parameter selections.  Switch back to the TUI backend with <code>F2</code> or the <strong>Plot: TUI</strong> button.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
